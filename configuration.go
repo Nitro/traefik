@@ -50,6 +50,7 @@ type GlobalConfiguration struct {
 	Kubernetes                *provider.Kubernetes    `description:"Enable Kubernetes backend"`
 	Mesos                     *provider.Mesos         `description:"Enable Mesos backend"`
 	Eureka                    *provider.Eureka        `description:"Enable Eureka backend"`
+	Sidecar                   *provider.Sidecar       `description:"Enable Sidecar backend"`
 }
 
 // DefaultEntryPoints holds default entry points
@@ -309,6 +310,13 @@ type Retry struct {
 
 // NewTraefikDefaultPointersConfiguration creates a TraefikConfiguration with pointers default values
 func NewTraefikDefaultPointersConfiguration() *TraefikConfiguration {
+	//default Sidecar
+	var defaultSidecar provider.Sidecar
+	defaultSidecar.Watch = true
+	defaultSidecar.Endpoint = "http://127.0.0.1:7777/state.json"
+	defaultSidecar.Interval = 5
+	defaultSidecar.Frontend = "sidecar.toml"
+
 	//default Docker
 	var defaultDocker provider.Docker
 	defaultDocker.Watch = true

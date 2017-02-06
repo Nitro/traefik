@@ -373,6 +373,9 @@ func (server *Server) configureProviders() {
 	if server.globalConfiguration.Eureka != nil {
 		server.providers = append(server.providers, server.globalConfiguration.Eureka)
 	}
+	if server.globalConfiguration.Sidecar != nil {
+		server.providers = append(server.providers, server.globalConfiguration.Sidecar)
+	}
 }
 
 func (server *Server) startProviders() {

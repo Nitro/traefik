@@ -1,0 +1,7 @@
+[frontends]
+    [frontends.web]
+    backend = "web"
+    passHostHeader = true
+    entrypoints = ["http","https"]
+        [frontends.web.routes.test_1]
+        rule = "Host: some-aws-host"
