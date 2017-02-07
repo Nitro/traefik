@@ -3,6 +3,7 @@ package provider
 import (
 	"context"
 	"net/http"
+	"reflect"
 	"testing"
 	"time"
 
@@ -16,13 +17,21 @@ import (
 
 func Test_FetchState(t *testing.T) {
 	Convey("Verify Fetching State handler", t, func() {
+		var baseTime = time.Now().UTC().Round(time.Second)
+		var testPort = service.Port{Type: "tcp", Port: 8000, ServicePort: 8000}
+
 		httpmock.Activate()
 		defer httpmock.DeactivateAndReset()
 
 		httpmock.RegisterResponder("GET", "http://some.dummy.service",
 			func(req *http.Request) (*http.Response, error) {
 
+				// baseTime := time.Now().UTC().Round(time.Second)
+				// testPort := service.Port{Type: "tcp", Port: 8000, ServicePort: 8000}
+				service := service.Service{ID: "007", Name: "api", Hostname: "some-aws-host",
+					Updated: baseTime, Status: 1, Ports: []service.Port{testPort}}
 				returnState := catalog.NewServicesState()
+				returnState.AddServiceEntry(service)
 				resp, err := httpmock.NewJsonResponse(200, returnState)
 				if err != nil {
 					return httpmock.NewStringResponse(500, ""), nil
@@ -36,14 +45,23 @@ func Test_FetchState(t *testing.T) {
 		}
 
 		testState, err := prov.fetchState()
+		testServices := testState.ByService()
+
 		compareState := catalog.NewServicesState()
+		service := &service.Service{ID: "007", Name: "api", Hostname: "some-aws-host",
+			Updated: baseTime, Status: 1, Ports: []service.Port{testPort}}
+		compareState.AddServiceEntry(*service)
+		compareServices := compareState.ByService()
 
 		So(err, ShouldBeNil)
-		So(testState, ShouldHaveSameTypeAs, compareState)
+		So(reflect.DeepEqual(testServices["api"][0].Ports, compareServices["api"][0].Ports), ShouldBeTrue)
+		So(testServices["api"][0].Hostname, ShouldEqual, compareServices["api"][0].Hostname)
+
+		compareServices["api"][0].Hostname = "wrong-host"
+		So(testServices["api"][0].Hostname, ShouldNotEqual, compareServices["api"][0].Hostname)
 
 		prov.Endpoint = "http://yetanother.dummy.service"
 		_, err = prov.fetchState()
-
 		So(err, ShouldNotBeNil)
 	})
 }
