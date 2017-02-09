@@ -71,7 +71,6 @@ func Test_FetchBackend(t *testing.T) {
 
 		prov := Sidecar{
 			Endpoint: "http://some.dummy.service",
-			Interval: 5,
 		}
 
 		httpmock.RegisterResponder("GET", "http://some.dummy.service/state.json",
@@ -124,7 +123,6 @@ func Test_MakeFrontEnd(t *testing.T) {
 		)
 		prov := Sidecar{
 			Endpoint: "http://some.dummy.service",
-			Interval: 1,
 		}
 		prov.Watch = true
 		prov.Frontend = "testdata/sidecar_testdata.toml"
@@ -164,7 +162,6 @@ func Test_SidecarProvider(t *testing.T) {
 			Endpoint: "http://some.dummy.service",
 		}
 		prov.Watch = false
-		prov.Interval = 3
 		prov.Frontend = "testdata/sidecar_testdata.toml"
 
 		configurationChan := make(chan types.ConfigMessage, 100)
@@ -176,5 +173,59 @@ func Test_SidecarProvider(t *testing.T) {
 		So(configMsg.ProviderName, ShouldEqual, "sidecar")
 		So(configMsg.Configuration.Frontends["web"].Routes["test_1"].Rule, ShouldEqual, "Host: some-aws-host")
 		So(configMsg.Configuration.Backends["web"].Servers["some-aws-host"].URL, ShouldEndWith, "http://some-aws-host:8000")
+	})
+}
+
+func Test_SidecarWatcher(t *testing.T) {
+	Convey("Verify Sidecar Provider", t, func() {
+		httpmock.Activate()
+		defer httpmock.DeactivateAndReset()
+
+		httpmock.RegisterResponder("GET", "http://some.dummy.service/state.json",
+			func(req *http.Request) (*http.Response, error) {
+
+				testPort := service.Port{Type: "tcp", Port: 9000, ServicePort: 9000}
+				returnState := catalog.NewServicesState()
+				baseTime := time.Now().UTC().Round(time.Second)
+				serv := service.Service{ID: "007", Name: "web", Hostname: "some-aws-host",
+					Updated: baseTime.Add(5 * time.Second), Status: 0, Ports: []service.Port{testPort}}
+				returnState.AddServiceEntry(serv)
+				resp, err := httpmock.NewJsonResponse(200, returnState)
+				if err != nil {
+					return httpmock.NewStringResponse(500, ""), nil
+				}
+				return resp, nil
+			},
+		)
+
+		httpmock.RegisterResponder("GET", "http://some.dummy.service/watch",
+			func(req *http.Request) (*http.Response, error) {
+
+				testPort := service.Port{Type: "tcp", Port: 9000, ServicePort: 9000}
+				returnState := catalog.NewServicesState()
+				baseTime := time.Now().UTC().Round(time.Second)
+				serv := service.Service{ID: "007", Name: "web", Hostname: "some-aws-host",
+					Updated: baseTime.Add(5 * time.Second), Status: 0, Ports: []service.Port{testPort}}
+				returnState.AddServiceEntry(serv)
+				resp, err := httpmock.NewJsonResponse(200, returnState.ByService())
+				if err != nil {
+					return httpmock.NewStringResponse(500, ""), nil
+				}
+				return resp, nil
+			},
+		)
+		prov := Sidecar{
+			Endpoint: "http://some.dummy.service",
+		}
+		prov.Watch = true
+		prov.Frontend = "testdata/sidecar_testdata.toml"
+		configurationChan := make(chan types.ConfigMessage, 100)
+		constraints := types.Constraints{}
+		pool := safe.NewPool(context.Background())
+		go prov.Provide(configurationChan, pool, constraints)
+		configMsg, _ := <-configurationChan
+		So(configMsg.ProviderName, ShouldEqual, "sidecar")
+		So(configMsg.Configuration.Frontends["web"].Routes["test_1"].Rule, ShouldEqual, "Host: some-aws-host")
+		So(configMsg.Configuration.Backends["web"].Servers["some-aws-host"].URL, ShouldEndWith, "http://some-aws-host:9000")
 	})
 }
