@@ -89,7 +89,7 @@ func (provider *Sidecar) Provide(configurationChan chan<- types.ConfigMessage, p
 	}
 	states, err := provider.fetchState()
 	if err != nil {
-		log.Errorln("Error reloading Sidecar config", err)
+		log.Fatalln("Error reloading Sidecar config", err)
 	}
 	err = provider.loadSidecarConfig(states.ByService())
 	if err != nil {
@@ -151,7 +151,7 @@ func (provider *Sidecar) recycleConn(resp *http.Response, client *http.Client) {
 
 func (provider *Sidecar) callbackLoader(sidecarStates map[string][]*service.Service, err error) error {
 	if err != nil {
-		log.Errorf("Error decoding stream %s", err)
+		log.Errorln("Error decoding stream ", err)
 		return err
 	}
 	provider.loadSidecarConfig(sidecarStates)
