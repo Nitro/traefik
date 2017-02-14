@@ -164,7 +164,7 @@ func Test_SidecarProvider(t *testing.T) {
 		prov.Watch = false
 		prov.Frontend = "testdata/sidecar_testdata.toml"
 
-		configurationChan := make(chan types.ConfigMessage, 100)
+		configurationChan := make(chan types.ConfigMessage, 1)
 		constraints := types.Constraints{}
 		pool := safe.NewPool(context.Background())
 		err := prov.Provide(configurationChan, pool, constraints)

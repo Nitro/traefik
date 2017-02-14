@@ -34,10 +34,10 @@ var _ Provider = (*Sidecar)(nil)
 // Sidecar holds configurations of the Sidecar provider
 type Sidecar struct {
 	BaseProvider      `mapstructure:",squash"`
-	Endpoint          string        `description:"Sidecar URL"`
-	Interval          time.Duration `description:"How often to poll Sidecar URL for backend changes and file for frontend changes"`
-	Frontend          string        `description:"Configuration file for frontend"`
+	Endpoint          string `description:"Sidecar URL"`
+	Frontend          string `description:"Configuration file for frontend"`
 	configurationChan chan<- types.ConfigMessage
+	RefreshConn       time.Duration `description:"How often to refresh the connection to Sidecar backend"`
 }
 
 type callback func(map[string][]*service.Service, error)
@@ -46,11 +46,6 @@ type callback func(map[string][]*service.Service, error)
 // using the given configuration channel.
 func (provider *Sidecar) Provide(configurationChan chan<- types.ConfigMessage, pool *safe.Pool, constraints types.Constraints) error {
 	provider.configurationChan = configurationChan
-	err := provider.loadSidecarConfig()
-	if err != nil {
-		return err
-	}
-
 	if provider.Watch {
 		safe.Go(func() { provider.sidecarWatcher() })
 
@@ -75,10 +70,14 @@ func (provider *Sidecar) Provide(configurationChan chan<- types.ConfigMessage, p
 				case event := <-watcher.Events:
 					if strings.Contains(event.Name, file.Name()) {
 						log.Debug("Sidecar Frontend File event:", event)
-						provider.loadSidecarConfig()
+						states, errState := provider.fetchState()
+						if errState != nil {
+							log.Errorln("Error reloading Sidecar config", errState)
+						}
+						provider.loadSidecarConfig(states.ByService())
 					}
-				case error := <-watcher.Errors:
-					log.Error("Watcher event error", error)
+				case errWatcher := <-watcher.Errors:
+					log.Errorln("Watcher event error", errWatcher)
 				}
 			}
 		})
@@ -88,12 +87,19 @@ func (provider *Sidecar) Provide(configurationChan chan<- types.ConfigMessage, p
 			return err
 		}
 	}
+	states, err := provider.fetchState()
+	if err != nil {
+		log.Fatalln("Error reloading Sidecar config", err)
+	}
+	err = provider.loadSidecarConfig(states.ByService())
+	if err != nil {
+		return err
+	}
 	return nil
 }
 
-func (provider *Sidecar) constructConfig(states *catalog.ServicesState) (*types.Configuration, error) {
+func (provider *Sidecar) constructConfig(sidecarStates map[string][]*service.Service) (*types.Configuration, error) {
 	sidecarConfig := types.Configuration{}
-	sidecarStates := states.ByService()
 	log.Infoln("loading sidecar config")
 	sidecarConfig.Backends = provider.makeBackends(sidecarStates)
 	log.Infoln("loading frontend config from file: ", provider.Frontend)
@@ -105,13 +111,8 @@ func (provider *Sidecar) constructConfig(states *catalog.ServicesState) (*types.
 	return &sidecarConfig, nil
 }
 
-func (provider *Sidecar) loadSidecarConfig() error {
-	states, err := provider.fetchState()
-	if err != nil {
-		log.Errorln("Error fetching state from Sidecar, ", err)
-		return err
-	}
-	conf, err := provider.constructConfig(states)
+func (provider *Sidecar) loadSidecarConfig(sidecarStates map[string][]*service.Service) error {
+	conf, err := provider.constructConfig(sidecarStates)
 	if err != nil {
 		return err
 	}
@@ -123,42 +124,44 @@ func (provider *Sidecar) loadSidecarConfig() error {
 }
 
 func (provider *Sidecar) sidecarWatcher() error {
-	client := &http.Client{Timeout: 0}
+	//set timeout to be just a bot more than connection refresh interval
+	client := &http.Client{Timeout: (provider.RefreshConn + 3) * time.Second}
 	resp, err := client.Get(provider.Endpoint + "/watch")
 	if err != nil {
 		return err
 	}
-	err = catalog.DecodeStream(resp.Body, provider.callbackLoader)
-	if err != nil {
-		return err
-	}
-	for { //check for open http connection, try to re-init if it fails
-		if resp.Close {
-			resp, err = client.Get(provider.Endpoint + "/watch")
-			if err != nil {
-				return err
-			}
-			err = catalog.DecodeStream(resp.Body, provider.callbackLoader)
-			if err != nil {
-				return err
-			}
+	go catalog.DecodeStream(resp.Body, provider.callbackLoader)
+	log.Infof("Using %s Sidecar connection refresh interval", provider.RefreshConn)
+	provider.recycleConn(resp, client)
+	return nil
+}
+
+func (provider *Sidecar) recycleConn(resp *http.Response, client *http.Client) {
+	var err error
+	for { //use refresh interval to occasionally reconnect to Sidecar in case the stream connection is lost
+		time.Sleep(provider.RefreshConn * time.Second)
+		resp, err = client.Get(provider.Endpoint + "/watch")
+		if err != nil {
+			log.Errorf("Error connecting to Sidecar: %s, Error: %s", provider.Endpoint, err)
+			continue
 		}
-		time.Sleep(1 * time.Second)
+		go catalog.DecodeStream(resp.Body, provider.callbackLoader)
 	}
 }
 
-func (provider *Sidecar) callbackLoader(sideBackend map[string][]*service.Service, err error) error {
-	err = provider.loadSidecarConfig()
+func (provider *Sidecar) callbackLoader(sidecarStates map[string][]*service.Service, err error) error {
 	if err != nil {
+		log.Errorln("Error decoding stream ", err)
 		return err
 	}
+	provider.loadSidecarConfig(sidecarStates)
 	return nil
 }
 
 func (provider *Sidecar) makeFrontend() (map[string]*types.Frontend, error) {
 	configuration := new(types.Configuration)
 	if _, err := toml.DecodeFile(provider.Frontend, configuration); err != nil {
-		log.Error("Error reading file:", err)
+		log.Errorf("Error reading file: %s", err)
 		return nil, err
 	}
 	return configuration.Frontends, nil
