@@ -315,7 +315,7 @@ func NewTraefikDefaultPointersConfiguration() *TraefikConfiguration {
 	//default Sidecar
 	var defaultSidecar provider.Sidecar
 	defaultSidecar.Watch = true
-	defaultSidecar.Endpoint = "http://127.0.0.1:7777/state.json"
+	defaultSidecar.Endpoint = "http://127.0.0.1:7777"
 	defaultSidecar.Frontend = "sidecar.toml"
 	defaultSidecar.RefreshConn = 60
 
