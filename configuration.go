@@ -50,12 +50,9 @@ type GlobalConfiguration struct {
 	Kubernetes                *provider.Kubernetes    `description:"Enable Kubernetes backend"`
 	Mesos                     *provider.Mesos         `description:"Enable Mesos backend"`
 	Eureka                    *provider.Eureka        `description:"Enable Eureka backend"`
-<<<<<<< HEAD
 	Sidecar                   *provider.Sidecar       `description:"Enable Sidecar backend"`
-=======
 	ECS                       *provider.ECS           `description:"Enable ECS backend"`
 	Rancher                   *provider.Rancher       `description:"Enable Rancher backend"`
->>>>>>> origin/master
 }
 
 // DefaultEntryPoints holds default entry points
