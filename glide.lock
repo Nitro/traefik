@@ -1,10 +1,12 @@
-hash: ccd56edd81d054a00b23493227ff0765b020aa1de24f8a9d9ff54a05c0223885
-updated: 2017-02-03T09:45:05.719219148+01:00
+hash: 82b3266d2093d3c73a27da19574e1d6c424c59ca8426874251444d183fdf6ec1
+updated: 2017-03-01T12:01:42.755454487-08:00
 imports:
 - name: bitbucket.org/ww/goautoneg
   version: 75cd24fc2f2c2a2088577d12123ddee5f54e0675
 - name: github.com/abbot/go-http-auth
   version: cb4372376e1e00e9f6ab9ec142e029302c9e7140
+- name: github.com/armon/go-metrics
+  version: 06b60999766278efd6d2b5d8418a58c3d5b99e87
 - name: github.com/ArthurHlt/go-eureka-client
   version: ba361cd0f9f571b4e871421423d2f02f5689c3d2
   subpackages:
@@ -232,8 +234,10 @@ imports:
   subpackages:
   - log
   - swagger
+- name: github.com/fsouza/go-dockerclient
+  version: 3134ad4ea8f8a04974cde3ef3958e265c605b0c1
 - name: github.com/gambol99/go-marathon
-  version: 9ab64d9f0259e8800911d92ebcd4d5b981917919
+  version: 6b00a5b651b1beb2c6821863f7c60df490bd46c8
 - name: github.com/ghodss/yaml
   version: 04f313413ffd65ce25f2541bfd2b2ceec5c0908c
 - name: github.com/go-ini/ini
@@ -279,8 +283,16 @@ imports:
   version: fce7d75609a04eeb9d4bf41c8dc592aac18fc97d
   subpackages:
   - api
+- name: github.com/hashicorp/errwrap
+  version: 7554cd9344cec97297fa6649b055a8c98c2a1e55
 - name: github.com/hashicorp/go-cleanhttp
-  version: 875fb671b3ddc66f8e2f0acc33829c8cb989a38d
+  version: ad28ea4487f05916463e2423a55166280e8254b5
+- name: github.com/hashicorp/go-msgpack
+  version: fa3f63826f7c23912c15263591e65d54d080b458
+  subpackages:
+  - codec
+- name: github.com/hashicorp/go-multierror
+  version: d30f09973e19c1dfcd120b2d9c4f168e68d6b5d5
 - name: github.com/hashicorp/go-version
   version: e96d3840402619007766590ecea8dd7af1292276
 - name: github.com/hashicorp/serf
@@ -346,12 +358,20 @@ imports:
   version: f3009df150dadf309fdee4a54ed65c124afad715
 - name: github.com/mvdan/xurls
   version: fa08908f19eca8c491d68c6bd8b4b44faea6daf8
+- name: github.com/Nitro/memberlist
+  version: 490eb18c36b5181b667a4cf41d05eabacd855aad
+- name: github.com/Nitro/sidecar
+  version: 506a20aafaf56053f05cc6c324ff8ce0eab12e81
+  subpackages:
+  - catalog
+  - output
+  - service
 - name: github.com/NYTimes/gziphandler
-  version: f6438dbf4a82c56684964b03956aa727b0d7816b
+  version: 6710af535839f57c687b62c4c23d649f9545d885
 - name: github.com/ogier/pflag
   version: 45c278ab3607870051a2ea9040bb85fcb8557481
 - name: github.com/opencontainers/runc
-  version: 1a81e9ab1f138c091fe5c86d0883f87716088527
+  version: c6a791bef906b0dfdf81e85b840bec475b8ec75e
   subpackages:
   - libcontainer/user
 - name: github.com/ovh/go-ovh
@@ -390,6 +410,8 @@ imports:
   version: ab4b0d7ff424c462da486aef27f354cdeb29a319
   subpackages:
   - src/egoscale
+- name: github.com/relistan/go-director
+  version: 9273dae8c839a114aa4472165f84e057d5b12e09
 - name: github.com/ryanuber/go-glob
   version: 572520ed46dbddaed19ea3d9541bdd0494163693
 - name: github.com/samuel/go-zookeeper
@@ -570,7 +592,7 @@ imports:
 - name: gopkg.in/yaml.v2
   version: bef53efd0c76e49e6de55ead051f886bea7e9420
 - name: k8s.io/client-go
-  version: 843f7c4f28b1f647f664f883697107d5c02c5acc
+  version: 1195e3a8ee1a529d53eed7c624527a68555ddf1f
   subpackages:
   - 1.5/discovery
   - 1.5/kubernetes
@@ -705,6 +727,8 @@ testImports:
   version: 11d3bc7aa68e238947792f30573146a3231fc0f1
 - name: github.com/gorilla/mux
   version: e444e69cbd2e2e3e0749a2f3c717cec491552bbf
+- name: github.com/jtolds/gls
+  version: 9a4a02dbe491bef4bab3c24fd9f3087d6c4c6690
 - name: github.com/libkermit/compose
   version: cadc5a3b83a15790174bd7fbc75ea2529785e772
   subpackages:
@@ -713,6 +737,16 @@ testImports:
   version: 55e3595409924fcfbb850811e5a7cdbe8960a0b7
 - name: github.com/libkermit/docker-check
   version: cbe0ef03b3d23070eac4d00ba8828f2cc7f7e5a3
+- name: github.com/smartystreets/assertions
+  version: edb6e295a22c57a2aa353b2f0729b6eff9f9f4b7
+  subpackages:
+  - internal/oglematchers
+- name: github.com/smartystreets/goconvey
+  version: 3c2572876754c4669ae7417b219f0b30a29b32c7
+  subpackages:
+  - convey
+  - convey/gotest
+  - convey/reporting
 - name: github.com/vbatts/tar-split
   version: 6810cedb21b2c3d0b9bb8f9af12ff2dc7a2f14df
   subpackages:
