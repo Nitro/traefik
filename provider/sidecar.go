@@ -25,7 +25,7 @@ const (
 	sticky               = false
 	maxConnAmount        = 300
 	maxConnExtractorFunc = "client.ip"
-	circuitBreaker       = "NetworkErrorRatio() > 0.5"
+	circuitBreaker       = "ResponseCodeRatio(500, 600, 0, 600) > 0.3"
 	weight               = 0
 )
 
