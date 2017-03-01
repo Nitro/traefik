@@ -23,6 +23,7 @@ import (
 	"github.com/codegangsta/negroni"
 	"github.com/containous/mux"
 	"github.com/containous/traefik/cluster"
+	"github.com/containous/traefik/healthcheck"
 	"github.com/containous/traefik/log"
 	"github.com/containous/traefik/middlewares"
 	"github.com/containous/traefik/provider"
@@ -373,8 +374,16 @@ func (server *Server) configureProviders() {
 	if server.globalConfiguration.Eureka != nil {
 		server.providers = append(server.providers, server.globalConfiguration.Eureka)
 	}
+<<<<<<< HEAD
 	if server.globalConfiguration.Sidecar != nil {
 		server.providers = append(server.providers, server.globalConfiguration.Sidecar)
+=======
+	if server.globalConfiguration.ECS != nil {
+		server.providers = append(server.providers, server.globalConfiguration.ECS)
+	}
+	if server.globalConfiguration.Rancher != nil {
+		server.providers = append(server.providers, server.globalConfiguration.Rancher)
+>>>>>>> origin/master
 	}
 }
 
@@ -551,6 +560,9 @@ func (server *Server) loadConfig(configurations configs, globalConfiguration Glo
 	redirectHandlers := make(map[string]http.Handler)
 
 	backends := map[string]http.Handler{}
+
+	backendsHealthcheck := map[string]*healthcheck.BackendHealthCheck{}
+
 	backend2FrontendMap := map[string]string{}
 	for _, configuration := range configurations {
 		frontendNames := sortedFrontendNamesForConfig(configuration)
@@ -650,6 +662,9 @@ func (server *Server) loadConfig(configurations configs, globalConfiguration Glo
 									log.Errorf("Skipping frontend %s...", frontendName)
 									continue frontend
 								}
+								if configuration.Backends[frontend.Backend].HealthCheck != nil {
+									backendsHealthcheck[frontend.Backend] = healthcheck.NewBackendHealthCheck(configuration.Backends[frontend.Backend].HealthCheck.URL, rebalancer)
+								}
 							}
 						case types.Wrr:
 							log.Debugf("Creating load-balancer wrr")
@@ -672,6 +687,9 @@ func (server *Server) loadConfig(configurations configs, globalConfiguration Glo
 									log.Errorf("Skipping frontend %s...", frontendName)
 									continue frontend
 								}
+							}
+							if configuration.Backends[frontend.Backend].HealthCheck != nil {
+								backendsHealthcheck[frontend.Backend] = healthcheck.NewBackendHealthCheck(configuration.Backends[frontend.Backend].HealthCheck.URL, rr)
 							}
 						}
 						maxConns := configuration.Backends[frontend.Backend].MaxConn
@@ -735,6 +753,7 @@ func (server *Server) loadConfig(configurations configs, globalConfiguration Glo
 			}
 		}
 	}
+	healthcheck.GetHealthCheck().SetBackendsConfiguration(server.routinesPool.Ctx(), backendsHealthcheck)
 	middlewares.SetBackend2FrontendMap(&backend2FrontendMap)
 	//sort routes
 	for _, serverEntryPoint := range serverEntryPoints {
