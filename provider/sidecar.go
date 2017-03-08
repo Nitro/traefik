@@ -126,21 +126,16 @@ func (provider *Sidecar) loadSidecarConfig(sidecarStates map[string][]*service.S
 func (provider *Sidecar) sidecarWatcher() error {
 	//set timeout to be just a bot more than connection refresh interval
 	client := &http.Client{Timeout: (provider.RefreshConn + 3) * time.Second}
-	resp, err := client.Get(provider.Endpoint + "/watch")
-	if err != nil {
-		return err
-	}
-	go catalog.DecodeStream(resp.Body, provider.callbackLoader)
 	log.Infof("Using %s Sidecar connection refresh interval", provider.RefreshConn)
-	provider.recycleConn(resp, client)
+	provider.recycleConn(client)
 	return nil
 }
 
-func (provider *Sidecar) recycleConn(resp *http.Response, client *http.Client) {
+func (provider *Sidecar) recycleConn(client *http.Client) {
 	var err error
+	var resp *http.Response
 	for { //use refresh interval to occasionally reconnect to Sidecar in case the stream connection is lost
 		resp, err = client.Get(provider.Endpoint + "/watch")
-
 		if err != nil {
 			log.Errorf("Error connecting to Sidecar: %s, Error: %s", provider.Endpoint, err)
 			time.Sleep(5 * time.Second)
