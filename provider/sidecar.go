@@ -139,7 +139,6 @@ func (provider *Sidecar) sidecarWatcher() error {
 func (provider *Sidecar) recycleConn(resp *http.Response, client *http.Client) {
 	var err error
 	for { //use refresh interval to occasionally reconnect to Sidecar in case the stream connection is lost
-		time.Sleep(provider.RefreshConn * time.Second)
 		resp, err = client.Get(provider.Endpoint + "/watch")
 
 		if err != nil {
@@ -148,6 +147,7 @@ func (provider *Sidecar) recycleConn(resp *http.Response, client *http.Client) {
 			continue
 		}
 		go catalog.DecodeStream(resp.Body, provider.callbackLoader)
+		time.Sleep(provider.RefreshConn * time.Second)
 	}
 }
 
