@@ -163,15 +163,17 @@ func (provider *Sidecar) recycleConn(client *http.Client, tr *http.Transport) {
 }
 
 func (provider *Sidecar) callbackLoader(sidecarStates map[string][]*service.Service, err error) error {
+	//load config regardless
+	provider.loadSidecarConfig(sidecarStates)
+
 	if err != nil {
 		return err
 	}
-	//reset refresh connection timer
+	//else reset refresh connection timer
 	if !provider.connTimer.Stop() {
 		<-provider.connTimer.C
 	}
 	provider.connTimer.Reset(provider.RefreshConn * time.Second)
-	provider.loadSidecarConfig(sidecarStates)
 	return nil
 }
 
