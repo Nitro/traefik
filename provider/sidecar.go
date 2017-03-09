@@ -38,6 +38,7 @@ type Sidecar struct {
 	Frontend          string `description:"Configuration file for frontend"`
 	configurationChan chan<- types.ConfigMessage
 	RefreshConn       time.Duration `description:"How often to refresh the connection to Sidecar backend"`
+	connTimer         *time.Timer
 }
 
 type callback func(map[string][]*service.Service, error)
@@ -125,24 +126,39 @@ func (provider *Sidecar) loadSidecarConfig(sidecarStates map[string][]*service.S
 
 func (provider *Sidecar) sidecarWatcher() error {
 	//set timeout to be just a bot more than connection refresh interval
-	client := &http.Client{Timeout: (provider.RefreshConn + 3) * time.Second}
+	provider.connTimer = time.NewTimer(provider.RefreshConn * time.Second)
+	tr := &http.Transport{ResponseHeaderTimeout: 0}
+	client := &http.Client{
+		Timeout:   0,
+		Transport: tr}
 	log.Infof("Using %s Sidecar connection refresh interval", provider.RefreshConn)
-	provider.recycleConn(client)
+	provider.recycleConn(client, tr)
 	return nil
 }
 
-func (provider *Sidecar) recycleConn(client *http.Client) {
+func (provider *Sidecar) recycleConn(client *http.Client, tr *http.Transport) {
 	var err error
 	var resp *http.Response
+	var req *http.Request
 	for { //use refresh interval to occasionally reconnect to Sidecar in case the stream connection is lost
-		resp, err = client.Get(provider.Endpoint + "/watch")
+		req, err = http.NewRequest("GET", provider.Endpoint+"/watch", nil)
+		if err != nil {
+			log.Errorf("Error creating http request to Sidecar: %s, Error: %s", provider.Endpoint, err)
+			continue
+		}
+		resp, err = client.Do(req)
 		if err != nil {
 			log.Errorf("Error connecting to Sidecar: %s, Error: %s", provider.Endpoint, err)
 			time.Sleep(5 * time.Second)
 			continue
 		}
 		go catalog.DecodeStream(resp.Body, provider.callbackLoader)
-		time.Sleep(provider.RefreshConn * time.Second)
+
+		//wait on refresh connection timer.  If this expires we haven't seen an update in a
+		//while and should cancel the request, reset the time, and reconnect just in case
+		<-provider.connTimer.C
+		provider.connTimer.Reset(provider.RefreshConn * time.Second)
+		tr.CancelRequest(req)
 	}
 }
 
@@ -150,6 +166,11 @@ func (provider *Sidecar) callbackLoader(sidecarStates map[string][]*service.Serv
 	if err != nil {
 		return err
 	}
+	//reset refresh connection timer
+	if !provider.connTimer.Stop() {
+		<-provider.connTimer.C
+	}
+	provider.connTimer.Reset(provider.RefreshConn * time.Second)
 	provider.loadSidecarConfig(sidecarStates)
 	return nil
 }
