@@ -158,6 +158,7 @@ func (provider *Sidecar) recycleConn(client *http.Client, tr *http.Transport) {
 		//while and should cancel the request, reset the time, and reconnect just in case
 		<-provider.connTimer.C
 		provider.connTimer.Reset(provider.RefreshConn * time.Second)
+		log.Errorln("Forced Refresh")
 		tr.CancelRequest(req)
 	}
 }
@@ -169,7 +170,7 @@ func (provider *Sidecar) callbackLoader(sidecarStates map[string][]*service.Serv
 	if err != nil {
 		return err
 	}
-	//else reset refresh connection timer
+	//else reset connection timer
 	if !provider.connTimer.Stop() {
 		<-provider.connTimer.C
 	}
