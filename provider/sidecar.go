@@ -21,12 +21,10 @@ import (
 )
 
 const (
-	method               = "drr"
-	sticky               = false
-	maxConnAmount        = 300
-	maxConnExtractorFunc = "client.ip"
-	circuitBreaker       = "ResponseCodeRatio(500, 600, 0, 600) > 0.3"
-	weight               = 0
+	method         = "drr"
+	sticky         = false
+	circuitBreaker = "ResponseCodeRatio(500, 600, 0, 600) > 0.3"
+	weight         = 0
 )
 
 var _ Provider = (*Sidecar)(nil)
@@ -191,7 +189,6 @@ func (provider *Sidecar) makeBackends(sidecarStates map[string][]*service.Servic
 	for serviceName, services := range sidecarStates {
 		newServers := make(map[string]types.Server)
 		newBackend := &types.Backend{LoadBalancer: &types.LoadBalancer{Method: method, Sticky: sticky},
-			MaxConn:        &types.MaxConn{Amount: maxConnAmount, ExtractorFunc: maxConnExtractorFunc},
 			CircuitBreaker: &types.CircuitBreaker{Expression: circuitBreaker},
 			Servers:        newServers}
 		for _, serv := range services {

@@ -98,9 +98,7 @@ func Test_FetchBackend(t *testing.T) {
 
 		So(err, ShouldBeNil)
 		So(backs["web"].LoadBalancer.Method, ShouldEqual, "drr")
-		So(backs["web"].MaxConn.Amount, ShouldEqual, 300)
 		So(backs["web"].Servers["some-aws-host"].URL, ShouldEqual, "http://some-aws-host:8000")
-		So(backs["api"].MaxConn.ExtractorFunc, ShouldEqual, "client.ip")
 		So(backs["api"].Servers["another-aws-host"], ShouldBeZeroValue)
 	})
 }
