@@ -24,7 +24,6 @@ const (
 	method         = "drr"
 	sticky         = false
 	circuitBreaker = "ResponseCodeRatio(500, 600, 0, 600) > 0.3"
-	weight         = 0
 )
 
 var _ Provider = (*Sidecar)(nil)
@@ -150,7 +149,7 @@ func (provider *Sidecar) recycleConn(client *http.Client, tr *http.Transport) {
 			time.Sleep(5 * time.Second)
 			continue
 		}
-		go catalog.DecodeStream(resp.Body, provider.callbackLoader)
+		safe.Go(func() { catalog.DecodeStream(resp.Body, provider.callbackLoader) })
 
 		//wait on refresh connection timer.  If this expires we haven't seen an update in a
 		//while and should cancel the request, reset the time, and reconnect just in case
@@ -197,9 +196,9 @@ func (provider *Sidecar) makeBackends(sidecarStates map[string][]*service.Servic
 					ipAddr, err := net.LookupIP(serv.Hostname)
 					if err != nil {
 						log.Errorln("Error resolving Ip address, ", err)
-						newBackend.Servers[serv.Hostname] = types.Server{URL: "http://" + serv.Hostname + ":" + strconv.FormatInt(serv.Ports[i].Port, 10), Weight: weight}
+						newBackend.Servers[serv.Hostname] = types.Server{URL: "http://" + serv.Hostname + ":" + strconv.FormatInt(serv.Ports[i].Port, 10)}
 					} else {
-						newBackend.Servers[serv.Hostname] = types.Server{URL: "http://" + ipAddr[0].String() + ":" + strconv.FormatInt(serv.Ports[i].Port, 10), Weight: weight}
+						newBackend.Servers[serv.Hostname] = types.Server{URL: "http://" + ipAddr[0].String() + ":" + strconv.FormatInt(serv.Ports[i].Port, 10)}
 					}
 				}
 			}
