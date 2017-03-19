@@ -1,6 +1,7 @@
 package provider
 
 import (
+	"context"
 	"io/ioutil"
 	"net"
 	"net/http"
@@ -45,7 +46,10 @@ type callback func(map[string][]*service.Service, error)
 func (provider *Sidecar) Provide(configurationChan chan<- types.ConfigMessage, pool *safe.Pool, constraints types.Constraints) error {
 	provider.configurationChan = configurationChan
 	if provider.Watch {
-		safe.Go(func() { provider.sidecarWatcher() })
+		safe.Go(func() {
+			ctx := context.Background()
+			provider.sidecarWatcher(ctx)
+		})
 
 		watcher, err := fsnotify.NewWatcher()
 		if err != nil {
@@ -97,10 +101,8 @@ func (provider *Sidecar) Provide(configurationChan chan<- types.ConfigMessage, p
 }
 
 func (provider *Sidecar) constructConfig(sidecarStates map[string][]*service.Service) (*types.Configuration, error) {
-	sidecarConfig := types.Configuration{}
 	log.Infoln("loading sidecar config")
-	sidecarConfig.Backends = provider.makeBackends(sidecarStates)
-	log.Infoln("loading frontend config from file: ", provider.Frontend)
+	sidecarConfig := types.Configuration{Backends: provider.makeBackends(sidecarStates)}
 	var err error
 	sidecarConfig.Frontends, err = provider.makeFrontend()
 	if err != nil {
@@ -121,7 +123,7 @@ func (provider *Sidecar) loadSidecarConfig(sidecarStates map[string][]*service.S
 	return nil
 }
 
-func (provider *Sidecar) sidecarWatcher() error {
+func (provider *Sidecar) sidecarWatcher(ctx context.Context) error {
 	//set timeout to be just a bot more than connection refresh interval
 	provider.connTimer = time.NewTimer(provider.RefreshConn * time.Second)
 	tr := &http.Transport{ResponseHeaderTimeout: 0}
@@ -129,11 +131,11 @@ func (provider *Sidecar) sidecarWatcher() error {
 		Timeout:   0,
 		Transport: tr}
 	log.Infof("Using %s Sidecar connection refresh interval", provider.RefreshConn)
-	provider.recycleConn(client, tr)
+	provider.recycleConn(ctx, client, tr)
 	return nil
 }
 
-func (provider *Sidecar) recycleConn(client *http.Client, tr *http.Transport) {
+func (provider *Sidecar) recycleConn(ctx context.Context, client *http.Client, tr *http.Transport) {
 	var err error
 	var resp *http.Response
 	var req *http.Request
