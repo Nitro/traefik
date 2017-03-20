@@ -97,7 +97,7 @@ func Test_FetchBackend(t *testing.T) {
 		backs := prov.makeBackends(sidecarStates)
 
 		So(err, ShouldBeNil)
-		So(backs["web"].LoadBalancer.Method, ShouldEqual, "drr")
+		So(backs["web"].LoadBalancer.Method, ShouldEqual, "wrr")
 		So(backs["web"].Servers["some-aws-host"].URL, ShouldEqual, "http://some-aws-host:8000")
 		So(backs["api"].Servers["another-aws-host"], ShouldBeZeroValue)
 	})

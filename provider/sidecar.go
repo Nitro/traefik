@@ -1,7 +1,6 @@
 package provider
 
 import (
-	"context"
 	"io/ioutil"
 	"net"
 	"net/http"
@@ -22,7 +21,8 @@ import (
 )
 
 const (
-	method         = "drr"
+	method         = "wrr"
+	weight         = 1
 	sticky         = false
 	circuitBreaker = "ResponseCodeRatio(500, 600, 0, 600) > 0.3"
 )
@@ -47,8 +47,7 @@ func (provider *Sidecar) Provide(configurationChan chan<- types.ConfigMessage, p
 	provider.configurationChan = configurationChan
 	if provider.Watch {
 		safe.Go(func() {
-			ctx := context.Background()
-			provider.sidecarWatcher(ctx)
+			provider.sidecarWatcher()
 		})
 
 		watcher, err := fsnotify.NewWatcher()
@@ -123,7 +122,7 @@ func (provider *Sidecar) loadSidecarConfig(sidecarStates map[string][]*service.S
 	return nil
 }
 
-func (provider *Sidecar) sidecarWatcher(ctx context.Context) error {
+func (provider *Sidecar) sidecarWatcher() error {
 	//set timeout to be just a bot more than connection refresh interval
 	provider.connTimer = time.NewTimer(provider.RefreshConn * time.Second)
 	tr := &http.Transport{ResponseHeaderTimeout: 0}
@@ -131,11 +130,11 @@ func (provider *Sidecar) sidecarWatcher(ctx context.Context) error {
 		Timeout:   0,
 		Transport: tr}
 	log.Infof("Using %s Sidecar connection refresh interval", provider.RefreshConn)
-	provider.recycleConn(ctx, client, tr)
+	provider.recycleConn(client, tr)
 	return nil
 }
 
-func (provider *Sidecar) recycleConn(ctx context.Context, client *http.Client, tr *http.Transport) {
+func (provider *Sidecar) recycleConn(client *http.Client, tr *http.Transport) {
 	var err error
 	var resp *http.Response
 	var req *http.Request
