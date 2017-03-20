@@ -53,6 +53,7 @@ import:
   subpackages:
   - mock
 - package: github.com/thoas/stats
+  version: 152b5d051953fdb6e45f14b6826962aadc032324
 - package: github.com/unrolled/render
 - package: github.com/vdemeester/docker-events
   version: be74d4929ec1ad118df54349fda4b0cba60f849b
@@ -128,6 +129,9 @@ import:
   - aws/endpoints
   - aws/request
   - aws/session
+  - service/dynamodb
+  - service/dynamodb/dynamodbiface
+  - service/dynamodbattribute
   - service/ec2
   - service/ecs
 - package: cloud.google.com/go

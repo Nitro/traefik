@@ -39,7 +39,8 @@ type CircuitBreaker struct {
 
 // HealthCheck holds HealthCheck configuration
 type HealthCheck struct {
-	URL string `json:"url,omitempty"`
+	URL      string `json:"url,omitempty"`
+	Interval string `json:"interval,omitempty"`
 }
 
 // Server holds server configuration.
@@ -240,12 +241,14 @@ type Users []string
 
 // Basic HTTP basic authentication
 type Basic struct {
-	Users `mapstructure:","`
+	Users     `mapstructure:","`
+	UsersFile string
 }
 
 // Digest HTTP authentication
 type Digest struct {
-	Users `mapstructure:","`
+	Users     `mapstructure:","`
+	UsersFile string
 }
 
 // CanonicalDomain returns a lower case domain with trim space

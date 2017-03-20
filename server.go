@@ -383,18 +383,22 @@ func (server *Server) configureProviders() {
 	if server.globalConfiguration.Rancher != nil {
 		server.providers = append(server.providers, server.globalConfiguration.Rancher)
 	}
+	if server.globalConfiguration.DynamoDB != nil {
+		server.providers = append(server.providers, server.globalConfiguration.DynamoDB)
+	}
 }
 
 func (server *Server) startProviders() {
 	// start providers
 	for _, provider := range server.providers {
+		providerType := reflect.TypeOf(provider)
 		jsonConf, _ := json.Marshal(provider)
-		log.Infof("Starting provider %v %s", reflect.TypeOf(provider), jsonConf)
+		log.Infof("Starting provider %v %s", providerType, jsonConf)
 		currentProvider := provider
 		safe.Go(func() {
 			err := currentProvider.Provide(server.configurationChan, server.routinesPool, server.globalConfiguration.Constraints)
 			if err != nil {
-				log.Errorf("Error starting provider %s", err)
+				log.Errorf("Error starting provider %v: %s", providerType, err)
 			}
 		})
 	}
@@ -661,7 +665,15 @@ func (server *Server) loadConfig(configurations configs, globalConfiguration Glo
 									continue frontend
 								}
 								if configuration.Backends[frontend.Backend].HealthCheck != nil {
-									backendsHealthcheck[frontend.Backend] = healthcheck.NewBackendHealthCheck(configuration.Backends[frontend.Backend].HealthCheck.URL, rebalancer)
+									var interval time.Duration
+									if configuration.Backends[frontend.Backend].HealthCheck.Interval != "" {
+										interval, err = time.ParseDuration(configuration.Backends[frontend.Backend].HealthCheck.Interval)
+										if err != nil {
+											log.Errorf("Wrong healthcheck interval: %s", err)
+											interval = time.Second * 30
+										}
+									}
+									backendsHealthcheck[frontend.Backend] = healthcheck.NewBackendHealthCheck(configuration.Backends[frontend.Backend].HealthCheck.URL, interval, rebalancer)
 								}
 							}
 						case types.Wrr:
@@ -687,7 +699,15 @@ func (server *Server) loadConfig(configurations configs, globalConfiguration Glo
 								}
 							}
 							if configuration.Backends[frontend.Backend].HealthCheck != nil {
-								backendsHealthcheck[frontend.Backend] = healthcheck.NewBackendHealthCheck(configuration.Backends[frontend.Backend].HealthCheck.URL, rr)
+								var interval time.Duration
+								if configuration.Backends[frontend.Backend].HealthCheck.Interval != "" {
+									interval, err = time.ParseDuration(configuration.Backends[frontend.Backend].HealthCheck.Interval)
+									if err != nil {
+										log.Errorf("Wrong healthcheck interval: %s", err)
+										interval = time.Second * 30
+									}
+								}
+								backendsHealthcheck[frontend.Backend] = healthcheck.NewBackendHealthCheck(configuration.Backends[frontend.Backend].HealthCheck.URL, interval, rr)
 							}
 						}
 						maxConns := configuration.Backends[frontend.Backend].MaxConn

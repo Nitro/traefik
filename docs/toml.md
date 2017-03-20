@@ -191,20 +191,24 @@ Supported filters:
 # To enable basic auth on an entrypoint
 # with 2 user/pass: test:test and test2:test2
 # Passwords can be encoded in MD5, SHA1 and BCrypt: you can use htpasswd to generate those ones
+# Users can be specified directly in the toml file, or indirectly by referencing an external file; if both are provided, the two are merged, with external file contents having precedence
 # [entryPoints]
 #   [entryPoints.http]
 #   address = ":80"
 #   [entryPoints.http.auth.basic]
 #   users = ["test:$apr1$H6uskkkW$IgXLP6ewTrSuBkTrqE8wj/", "test2:$apr1$d9hr9HBB$4HxwgUir3HP4EsggP/QNo0"]
+#   usersFile = "/path/to/.htpasswd"
 #
 # To enable digest auth on an entrypoint
 # with 2 user/realm/pass: test:traefik:test and test2:traefik:test2
 # You can use htdigest to generate those ones
+# Users can be specified directly in the toml file, or indirectly by referencing an external file; if both are provided, the two are merged, with external file contents having precedence
 # [entryPoints]
 #   [entryPoints.http]
 #   address = ":80"
 #   [entryPoints.http.auth.basic]
 #   users = ["test:traefik:a2688e031edb4be6a3797f3882655c05 ", "test2:traefik:518845800f9e2bfb1f1f740ec24f074e"]
+#   usersFile = "/path/to/.htdigest"
 #
 # To specify an https entrypoint with a minimum TLS version, and specifying an array of cipher suites (from crypto/tls):
 # [entryPoints]
@@ -551,14 +555,17 @@ address = ":8080"
 # To enable basic auth on the webui
 # with 2 user/pass: test:test and test2:test2
 # Passwords can be encoded in MD5, SHA1 and BCrypt: you can use htpasswd to generate those ones
+# Users can be specified directly in the toml file, or indirectly by referencing an external file; if both are provided, the two are merged, with external file contents having precedence
 #   [web.auth.basic]
 #     users = ["test:$apr1$H6uskkkW$IgXLP6ewTrSuBkTrqE8wj/", "test2:$apr1$d9hr9HBB$4HxwgUir3HP4EsggP/QNo0"]
+#     usersFile = "/path/to/.htpasswd"
 # To enable digest auth on the webui
 # with 2 user/realm/pass: test:traefik:test and test2:traefik:test2
 # You can use htdigest to generate those ones
+# Users can be specified directly in the toml file, or indirectly by referencing an external file; if both are provided, the two are merged, with external file contents having precedence
 #   [web.auth.digest]
 #     users = ["test:traefik:a2688e031edb4be6a3797f3882655c05 ", "test2:traefik:518845800f9e2bfb1f1f740ec24f074e"]
-
+#     usersFile = "/path/to/.htdigest"
 ```
 
 - `/`: provides a simple HTML frontend of Træfik
@@ -816,6 +823,17 @@ Labels can be used on containers to override default behaviour:
 - `traefik.frontend.entryPoints=http,https`: assign this frontend to entry points `http` and `https`. Overrides `defaultEntryPoints`.
 - `traefik.docker.network`: Set the docker network to use for connections to this container
 
+If several ports need to be exposed from a container, the services labels can be used
+- `traefik.<service-name>.port=443`: create a service binding with frontend/backend using this port. Overrides `traefik.port`.
+- `traefik.<service-name>.protocol=https`: assign `https` protocol. Overrides `traefik.protocol`.
+- `traefik.<service-name>.weight=10`: assign this service weight. Overrides `traefik.weight`.
+- `traefik.<service-name>.frontend.backend=fooBackend`: assign this service frontend to `foobackend`. Default is to assign to the service backend.
+- `traefik.<service-name>.frontend.entryPoints=http`: assign this service entrypoints. Overrides `traefik.frontend.entrypoints`.
+- `traefik.<service-name>.frontend.passHostHeader=true`: Forward client `Host` header to the backend. Overrides `traefik.frontend.passHostHeader`.
+- `traefik.<service-name>.frontend.priority=10`: assign the service frontend priority. Overrides `traefik.frontend.priority`.
+- `traefik.<service-name>.frontend.rule=Path:/foo`: assign the service frontend rule. Overrides `traefik.frontend.rule`.
+
+
 NB: when running inside a container, Træfɪk will need network access through `docker network connect <network> <traefik-container>`
 
 ## Marathon backend
@@ -1042,17 +1060,46 @@ Træfɪk can be configured to use Kubernetes Ingress as a backend configuration:
 
 # Kubernetes server endpoint
 #
-# When deployed as a replication controller in Kubernetes,
-# Traefik will use env variable KUBERNETES_SERVICE_HOST
-# and KUBERNETES_SERVICE_PORT_HTTPS as endpoint
+# When deployed as a replication controller in Kubernetes, Traefik will use
+# the environment variables KUBERNETES_SERVICE_HOST and KUBERNETES_SERVICE_PORT
+# to construct the endpoint.
 # Secure token will be found in /var/run/secrets/kubernetes.io/serviceaccount/token
 # and SSL CA cert in /var/run/secrets/kubernetes.io/serviceaccount/ca.crt
 #
-# Optional
+# The endpoint may be given to override the environment variable values.
+#
+# When the environment variables are not found, Traefik will try to connect to
+# the Kubernetes API server with an external-cluster client. In this case, the
+# endpoint is required. Specifically, it may be set to the URL used by
+# `kubectl proxy` to connect to a Kubernetes cluster from localhost.
+#
+# Optional for in-cluster configuration, required otherwise
+# Default: empty
 #
 # endpoint = "http://localhost:8080"
-# namespaces = ["default","production"]
+
+# Bearer token used for the Kubernetes client configuration.
 #
+# Optional
+# Default: empty
+#
+# token = "my token"
+
+# Path to the certificate authority file used for the Kubernetes client
+# configuration.
+#
+# Optional
+# Default: empty
+#
+# certAuthFilePath = "/my/ca.crt"
+
+# Array of namespaces to watch.
+#
+# Optional
+# Default: ["default"].
+#
+# namespaces = ["default", "production"]
+
 # See: http://kubernetes.io/docs/user-guide/labels/#list-and-watch-filtering
 # labelselector = "A and not B"
 #
@@ -1423,3 +1470,173 @@ Labels can be used on task containers to override default behaviour:
 - `traefik.frontend.passHostHeader=true`: forward client `Host` header to the backend.
 - `traefik.frontend.priority=10`: override default frontend priority
 - `traefik.frontend.entryPoints=http,https`: assign this frontend to entry points `http` and `https`. Overrides `defaultEntryPoints`.
+
+If `AccessKeyID`/`SecretAccessKey` is not given credentials will be resolved in the following order:
+
+- From environment variables; `AWS_ACCESS_KEY_ID`, `AWS_SECRET_ACCESS_KEY`, and `AWS_SESSION_TOKEN`.
+- Shared credentials, determined by `AWS_PROFILE` and `AWS_SHARED_CREDENTIALS_FILE`, defaults to `default` and `~/.aws/credentials`.
+- EC2 instance role or ECS task role
+
+Træfɪk needs the following policy to read ECS information:
+
+```json
+{
+    "Version": "2012-10-17",
+    "Statement": [
+        {
+            "Sid": "Traefik ECS read access",
+            "Effect": "Allow",
+            "Action": [
+                "ecs:ListTasks",
+                "ecs:DescribeTasks",
+                "ecs:DescribeContainerInstances",
+                "ecs:DescribeTaskDefinition",
+                "ec2:DescribeInstances"
+            ],
+            "Resource": [
+                "*"
+            ]
+        }
+    ]
+}
+```
+
+# Rancher backend
+
+Træfɪk can be configured to use Rancher as a backend configuration:
+
+
+```toml
+################################################################
+# Rancher configuration backend
+################################################################
+
+# Enable Rancher configuration backend
+#
+# Optional
+#
+[rancher]
+
+# Default domain used.
+# Can be overridden by setting the "traefik.domain" label on an service.
+#
+# Required
+#
+domain = "rancher.localhost"
+
+# Enable watch Rancher changes
+#
+# Optional
+# Default: true
+#
+Watch = true
+
+# Expose Rancher services by default in traefik
+#
+# Optional
+# Default: true
+#
+ExposedByDefault = false
+
+# Endpoint to use when connecting to Rancher
+#
+# Optional
+# Endpoint = "http://rancherserver.example.com"
+
+# AccessKey to use when connecting to Rancher
+#
+# Optional
+# AccessKey = "XXXXXXXXX"
+
+# SecretKey to use when connecting to Rancher
+#
+# Optional
+# SecretKey = "XXXXXXXXXXX"
+
+```
+
+If you're deploying traefik as a service within rancher, you can alternatively set these labels on the service to let it only fetch data of its current environment. The settings `endpoint`, `accesskey` and `secretkey` can be omitted then.
+
+- `io.rancher.container.create_agent=true`
+- `io.rancher.container.agent.role=environment`
+
+Labels can be used on task containers to override default behaviour:
+
+- `traefik.protocol=https`: override the default `http` protocol
+- `traefik.weight=10`: assign this weight to the container
+- `traefik.enable=false`: disable this container in Træfɪk
+- `traefik.frontend.rule=Host:test.traefik.io`: override the default frontend rule (Default: `Host:{containerName}.{domain}`).
+- `traefik.frontend.passHostHeader=true`: forward client `Host` header to the backend.
+- `traefik.frontend.priority=10`: override default frontend priority
+- `traefik.frontend.entryPoints=http,https`: assign this frontend to entry points `http` and `https`. Overrides `defaultEntryPoints`.
+
+
+## DynamoDB backend
+
+Træfɪk can be configured to use Amazon DynamoDB as a backend configuration:
+
+
+```toml
+################################################################
+# DynamoDB configuration backend
+################################################################
+
+# Enable DynamoDB configuration backend
+#
+# Optional
+#
+[dynamodb]
+
+# DyanmoDB Table Name
+#
+# Optional
+#
+TableName = "traefik"
+
+# Enable watch DynamoDB changes
+#
+# Optional
+#
+Watch = true
+
+# Polling interval (in seconds)
+#
+# Optional
+#
+RefreshSeconds = 15
+
+# Region to use when connecting to AWS
+#
+# Required
+#
+# Region = "us-west-1"
+
+# AccessKeyID to use when connecting to AWS
+#
+# Optional
+#
+# AccessKeyID = "abc"
+
+# SecretAccessKey to use when connecting to AWS
+#
+# Optional
+#
+# SecretAccessKey = "123"
+
+# Endpoint of local dynamodb instance for testing
+#
+# Optional
+#
+# Endpoint = "http://localhost:8080"
+
+```
+
+Items in the dynamodb table must have three attributes: 
+
+
+- 'id' : string
+    - The id is the primary key.
+- 'name' : string
+    - The name is used as the name of the frontend or backend.
+- 'frontend' or 'backend' : map
+    - This attribute's structure matches exactly the structure of a Frontend or Backend type in traefik. See types/types.go for details. The presence or absence of this attribute determines its type. So an item should never have both a 'frontend' and a 'backend' attribute. 

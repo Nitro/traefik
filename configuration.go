@@ -53,6 +53,7 @@ type GlobalConfiguration struct {
 	Sidecar                   *provider.Sidecar       `description:"Enable Sidecar backend"`
 	ECS                       *provider.ECS           `description:"Enable ECS backend"`
 	Rancher                   *provider.Rancher       `description:"Enable Rancher backend"`
+	DynamoDB                  *provider.DynamoDB      `description:"Enable DynamoDB backend"`
 }
 
 // DefaultEntryPoints holds default entry points
@@ -414,6 +415,13 @@ func NewTraefikDefaultPointersConfiguration() *TraefikConfiguration {
 	defaultRancher.Watch = true
 	defaultRancher.ExposedByDefault = true
 
+	// default DynamoDB
+	var defaultDynamoDB provider.DynamoDB
+	defaultDynamoDB.Constraints = types.Constraints{}
+	defaultDynamoDB.RefreshSeconds = 15
+	defaultDynamoDB.TableName = "traefik"
+	defaultDynamoDB.Watch = true
+
 	defaultConfiguration := GlobalConfiguration{
 		Docker:        &defaultDocker,
 		File:          &defaultFile,
@@ -428,6 +436,7 @@ func NewTraefikDefaultPointersConfiguration() *TraefikConfiguration {
 		Mesos:         &defaultMesos,
 		ECS:           &defaultECS,
 		Rancher:       &defaultRancher,
+		DynamoDB:      &defaultDynamoDB,
 		Retry:         &Retry{},
 	}
 

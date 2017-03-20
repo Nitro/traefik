@@ -1,5 +1,5 @@
-hash: 82b3266d2093d3c73a27da19574e1d6c424c59ca8426874251444d183fdf6ec1
-updated: 2017-03-01T12:01:42.755454487-08:00
+hash: 9d7c36c335fe9106ec79cb86a3b3824c23b63d3fb3a3fb4c75bd6915f3afcdd4
+updated: 2017-03-08T18:53:12.139107148-07:00
 imports:
 - name: bitbucket.org/ww/goautoneg
   version: 75cd24fc2f2c2a2088577d12123ddee5f54e0675
@@ -46,6 +46,10 @@ imports:
   - private/protocol/restxml
   - private/protocol/xml/xmlutil
   - private/waiter
+  - service/dynamodb
+  - service/dynamodb/dynamodbattribute
+  - service/dynamodb/dynamodbiface
+  - service/dynamodbattribute
   - service/ec2
   - service/ecs
   - service/route53
@@ -469,7 +473,7 @@ imports:
   - assert
   - mock
 - name: github.com/thoas/stats
-  version: 79b768ff1780f4e5b0ed132e192bfeefe9f85a9c
+  version: 152b5d051953fdb6e45f14b6826962aadc032324
 - name: github.com/timewasted/linode
   version: 37e84520dcf74488f67654f9c775b9752c232dc1
   subpackages:
