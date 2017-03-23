@@ -27,8 +27,6 @@ import (
 	"github.com/coreos/go-systemd/daemon"
 	"github.com/docker/libkv/store"
 	"github.com/satori/go.uuid"
-
-	_ "net/http/pprof"
 )
 
 func main() {
@@ -140,6 +138,8 @@ Complete documentation is available at https://traefik.io`,
 	}
 
 	traefikConfiguration.ConfigFile = toml.ConfigFileUsed()
+	traefikConfiguration.ProvidersThrottleDuration *= time.Second
+	traefikConfiguration.IdleConnTimeout *= time.Second
 
 	kv, err = CreateKvSource(traefikConfiguration)
 	if err != nil {
@@ -161,9 +161,6 @@ Complete documentation is available at https://traefik.io`,
 			os.Exit(-1)
 		}
 	}
-	go func() {
-		log.Fatalf("http.ListenAndServe error: %s", http.ListenAndServe(":6060", nil))
-	}()
 
 	if err := s.Run(); err != nil {
 		fmtlog.Printf("Error running traefik: %s\n", err)
