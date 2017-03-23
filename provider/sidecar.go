@@ -129,7 +129,7 @@ func (provider *Sidecar) sidecarWatcher() error {
 	client := &http.Client{
 		Timeout:   0,
 		Transport: tr}
-	log.Infof("Using %s Sidecar connection refresh interval", provider.RefreshConn)
+	log.Infof("Using %s Sidecar connection refresh interval", provider.RefreshConn*time.Second)
 	provider.recycleConn(client, tr)
 	return nil
 }
