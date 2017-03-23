@@ -195,6 +195,7 @@ func (server *Server) startHTTPServers() {
 		if err != nil {
 			log.Fatal("Error preparing server: ", err)
 		}
+
 		serverEntryPoint := server.serverEntryPoints[newServerEntryPointName]
 		serverEntryPoint.httpServer = newsrv
 		go server.startServer(serverEntryPoint.httpServer, server.globalConfiguration)
@@ -527,15 +528,17 @@ func (server *Server) prepareServer(entryPointName string, router *middlewares.H
 	if oldServer == nil {
 		return manners.NewWithServer(
 			&http.Server{
-				Addr:      entryPoint.Address,
-				Handler:   negroni,
-				TLSConfig: tlsConfig,
+				Addr:        entryPoint.Address,
+				Handler:     negroni,
+				TLSConfig:   tlsConfig,
+				IdleTimeout: server.globalConfiguration.IdleConnTimeout,
 			}), nil
 	}
 	gracefulServer, err := oldServer.HijackListener(&http.Server{
-		Addr:      entryPoint.Address,
-		Handler:   negroni,
-		TLSConfig: tlsConfig,
+		Addr:        entryPoint.Address,
+		Handler:     negroni,
+		TLSConfig:   tlsConfig,
+		IdleTimeout: server.globalConfiguration.IdleConnTimeout,
 	}, tlsConfig)
 	if err != nil {
 		log.Errorf("Error hijacking server: %s", err)
@@ -552,6 +555,7 @@ func (server *Server) buildEntryPoints(globalConfiguration GlobalConfiguration) 
 			httpRouter: middlewares.NewHandlerSwitcher(router),
 		}
 	}
+
 	return serverEntryPoints
 }
 
