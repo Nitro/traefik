@@ -138,8 +138,6 @@ Complete documentation is available at https://traefik.io`,
 	}
 
 	traefikConfiguration.ConfigFile = toml.ConfigFileUsed()
-	traefikConfiguration.ProvidersThrottleDuration *= time.Second
-	traefikConfiguration.IdleConnTimeout *= time.Second
 
 	kv, err = CreateKvSource(traefikConfiguration)
 	if err != nil {
