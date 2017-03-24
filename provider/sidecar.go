@@ -160,19 +160,19 @@ func (provider *Sidecar) recycleConn(client *http.Client, tr *http.Transport) {
 	}
 }
 
-func (provider *Sidecar) callbackLoader(sidecarStates map[string][]*service.Service, err error) error {
+func (provider *Sidecar) callbackLoader(sidecarStates map[string][]*service.Service, err error) {
 	//load config regardless
 	provider.loadSidecarConfig(sidecarStates)
 
 	if err != nil {
-		return err
+		return
 	}
 	//else reset connection timer
 	if !provider.connTimer.Stop() {
 		<-provider.connTimer.C
 	}
 	provider.connTimer.Reset(provider.RefreshConn * time.Second)
-	return nil
+	return
 }
 
 func (provider *Sidecar) makeFrontend() (map[string]*types.Frontend, error) {
