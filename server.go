@@ -17,6 +17,7 @@ import (
 	"reflect"
 	"regexp"
 	"sort"
+	"sync"
 	"syscall"
 	"time"
 
@@ -29,7 +30,6 @@ import (
 	"github.com/containous/traefik/provider"
 	"github.com/containous/traefik/safe"
 	"github.com/containous/traefik/types"
-	"github.com/mailgun/manners"
 	"github.com/streamrail/concurrent-map"
 	"github.com/vulcand/oxy/cbreaker"
 	"github.com/vulcand/oxy/connlimit"
@@ -58,7 +58,7 @@ type Server struct {
 type serverEntryPoints map[string]*serverEntryPoint
 
 type serverEntryPoint struct {
-	httpServer *manners.GracefulServer
+	httpServer *http.Server
 	httpRouter *middlewares.HandlerSwitcher
 }
 
@@ -114,21 +114,30 @@ func (server *Server) Wait() {
 
 // Stop stops the server
 func (server *Server) Stop() {
-	for serverEntryPointName, serverEntryPoint := range server.serverEntryPoints {
-		ctx, cancel := context.WithTimeout(context.Background(), time.Duration(server.globalConfiguration.GraceTimeOut)*time.Second)
-		go func() {
-			log.Debugf("Waiting %d seconds before killing connections on entrypoint %s...", 30, serverEntryPointName)
-			serverEntryPoint.httpServer.BlockingClose()
+	defer log.Info("Server stopped")
+	var wg sync.WaitGroup
+	for sepn, sep := range server.serverEntryPoints {
+		wg.Add(1)
+		go func(serverEntryPointName string, serverEntryPoint *serverEntryPoint) {
+			defer wg.Done()
+			graceTimeOut := time.Duration(server.globalConfiguration.GraceTimeOut)
+			ctx, cancel := context.WithTimeout(context.Background(), graceTimeOut)
+			log.Debugf("Waiting %s seconds before killing connections on entrypoint %s...", graceTimeOut, serverEntryPointName)
+			if err := serverEntryPoint.httpServer.Shutdown(ctx); err != nil {
+				log.Debugf("Wait is over due to: %s", err)
+				serverEntryPoint.httpServer.Close()
+			}
 			cancel()
-		}()
-		<-ctx.Done()
+			log.Debugf("Entrypoint %s closed", serverEntryPointName)
+		}(sepn, sep)
 	}
+	wg.Wait()
 	server.stopChan <- true
 }
 
 // Close destroys the server
 func (server *Server) Close() {
-	ctx, cancel := context.WithTimeout(context.Background(), time.Duration(server.globalConfiguration.GraceTimeOut)*time.Second)
+	ctx, cancel := context.WithTimeout(context.Background(), time.Duration(server.globalConfiguration.GraceTimeOut))
 	go func(ctx context.Context) {
 		<-ctx.Done()
 		if ctx.Err() == context.Canceled {
@@ -191,7 +200,7 @@ func (server *Server) startHTTPServers() {
 		if server.globalConfiguration.EntryPoints[newServerEntryPointName].Compress {
 			serverMiddlewares = append(serverMiddlewares, &middlewares.Compress{})
 		}
-		newsrv, err := server.prepareServer(newServerEntryPointName, newServerEntryPoint.httpRouter, server.globalConfiguration.EntryPoints[newServerEntryPointName], nil, serverMiddlewares...)
+		newsrv, err := server.prepareServer(newServerEntryPointName, newServerEntryPoint.httpRouter, server.globalConfiguration.EntryPoints[newServerEntryPointName], serverMiddlewares...)
 		if err != nil {
 			log.Fatal("Error preparing server: ", err)
 		}
@@ -224,16 +233,17 @@ func (server *Server) listenProviders(stop chan bool) {
 			} else {
 				lastConfigs.Set(configMsg.ProviderName, &configMsg)
 				lastReceivedConfigurationValue := lastReceivedConfiguration.Get().(time.Time)
-				if time.Now().After(lastReceivedConfigurationValue.Add(time.Duration(server.globalConfiguration.ProvidersThrottleDuration))) {
+				providersThrottleDuration := time.Duration(server.globalConfiguration.ProvidersThrottleDuration)
+				if time.Now().After(lastReceivedConfigurationValue.Add(providersThrottleDuration)) {
 					log.Debugf("Last %s config received more than %s, OK", configMsg.ProviderName, server.globalConfiguration.ProvidersThrottleDuration.String())
 					// last config received more than n s ago
 					server.configurationValidatedChan <- configMsg
 				} else {
 					log.Debugf("Last %s config received less than %s, waiting...", configMsg.ProviderName, server.globalConfiguration.ProvidersThrottleDuration.String())
 					safe.Go(func() {
-						<-time.After(server.globalConfiguration.ProvidersThrottleDuration)
+						<-time.After(providersThrottleDuration)
 						lastReceivedConfigurationValue := lastReceivedConfiguration.Get().(time.Time)
-						if time.Now().After(lastReceivedConfigurationValue.Add(time.Duration(server.globalConfiguration.ProvidersThrottleDuration))) {
+						if time.Now().After(lastReceivedConfigurationValue.Add(time.Duration(providersThrottleDuration))) {
 							log.Debugf("Waited for %s config, OK", configMsg.ProviderName)
 							if lastConfig, ok := lastConfigs.Get(configMsg.ProviderName); ok {
 								server.configurationValidatedChan <- *lastConfig.(*types.ConfigMessage)
@@ -497,21 +507,20 @@ func (server *Server) createTLSConfig(entryPointName string, tlsOption *TLS, rou
 	return config, nil
 }
 
-func (server *Server) startServer(srv *manners.GracefulServer, globalConfiguration GlobalConfiguration) {
+func (server *Server) startServer(srv *http.Server, globalConfiguration GlobalConfiguration) {
 	log.Infof("Starting server on %s", srv.Addr)
+	var err error
 	if srv.TLSConfig != nil {
-		if err := srv.ListenAndServeTLSWithConfig(srv.TLSConfig); err != nil {
-			log.Fatal("Error creating server: ", err)
-		}
+		err = srv.ListenAndServeTLS("", "")
 	} else {
-		if err := srv.ListenAndServe(); err != nil {
-			log.Fatal("Error creating server: ", err)
-		}
+		err = srv.ListenAndServe()
 	}
-	log.Info("Server stopped")
+	if err != nil {
+		log.Error("Error creating server: ", err)
+	}
 }
 
-func (server *Server) prepareServer(entryPointName string, router *middlewares.HandlerSwitcher, entryPoint *EntryPoint, oldServer *manners.GracefulServer, middlewares ...negroni.Handler) (*manners.GracefulServer, error) {
+func (server *Server) prepareServer(entryPointName string, router *middlewares.HandlerSwitcher, entryPoint *EntryPoint, middlewares ...negroni.Handler) (*http.Server, error) {
 	log.Infof("Preparing server %s %+v", entryPointName, entryPoint)
 	// middlewares
 	var negroni = negroni.New()
@@ -525,26 +534,12 @@ func (server *Server) prepareServer(entryPointName string, router *middlewares.H
 		return nil, err
 	}
 
-	if oldServer == nil {
-		return manners.NewWithServer(
-			&http.Server{
-				Addr:        entryPoint.Address,
-				Handler:     negroni,
-				TLSConfig:   tlsConfig,
-				IdleTimeout: server.globalConfiguration.IdleConnTimeout,
-			}), nil
-	}
-	gracefulServer, err := oldServer.HijackListener(&http.Server{
+	return &http.Server{
 		Addr:        entryPoint.Address,
 		Handler:     negroni,
 		TLSConfig:   tlsConfig,
-		IdleTimeout: server.globalConfiguration.IdleConnTimeout,
-	}, tlsConfig)
-	if err != nil {
-		log.Errorf("Error hijacking server: %s", err)
-		return nil, err
-	}
-	return gracefulServer, nil
+		IdleTimeout: time.Duration(server.globalConfiguration.IdleTimeout),
+	}, nil
 }
 
 func (server *Server) buildEntryPoints(globalConfiguration GlobalConfiguration) map[string]*serverEntryPoint {
