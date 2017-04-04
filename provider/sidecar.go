@@ -15,6 +15,7 @@ import (
 	"github.com/BurntSushi/toml"
 	"github.com/Nitro/sidecar/catalog"
 	"github.com/Nitro/sidecar/service"
+	"github.com/containous/flaeg"
 	"github.com/containous/traefik/log"
 	"github.com/containous/traefik/safe"
 	"github.com/containous/traefik/types"
@@ -35,7 +36,7 @@ type Sidecar struct {
 	Endpoint          string `description:"Sidecar URL"`
 	Frontend          string `description:"Configuration file for frontend"`
 	configurationChan chan<- types.ConfigMessage
-	RefreshConn       time.Duration `description:"How often to refresh the connection to Sidecar backend"`
+	RefreshConn       flaeg.Duration `description:"How often to refresh the connection to Sidecar backend"`
 	connTimer         *time.Timer
 }
 
@@ -124,12 +125,12 @@ func (provider *Sidecar) loadSidecarConfig(sidecarStates map[string][]*service.S
 
 func (provider *Sidecar) sidecarWatcher() error {
 	//set timeout to be just a bot more than connection refresh interval
-	provider.connTimer = time.NewTimer(provider.RefreshConn * time.Second)
+	provider.connTimer = time.NewTimer(time.Duration(provider.RefreshConn))
 	tr := &http.Transport{ResponseHeaderTimeout: 0}
 	client := &http.Client{
 		Timeout:   0,
 		Transport: tr}
-	log.Infof("Using %s Sidecar connection refresh interval", provider.RefreshConn*time.Second)
+	log.Debugf("Using %s Sidecar connection refresh interval", provider.RefreshConn)
 	provider.recycleConn(client, tr)
 	return nil
 }
@@ -155,7 +156,7 @@ func (provider *Sidecar) recycleConn(client *http.Client, tr *http.Transport) {
 		//wait on refresh connection timer.  If this expires we haven't seen an update in a
 		//while and should cancel the request, reset the time, and reconnect just in case
 		<-provider.connTimer.C
-		provider.connTimer.Reset(provider.RefreshConn * time.Second)
+		provider.connTimer.Reset(time.Duration(provider.RefreshConn))
 		tr.CancelRequest(req)
 	}
 }
@@ -171,7 +172,7 @@ func (provider *Sidecar) callbackLoader(sidecarStates map[string][]*service.Serv
 	if !provider.connTimer.Stop() {
 		<-provider.connTimer.C
 	}
-	provider.connTimer.Reset(provider.RefreshConn * time.Second)
+	provider.connTimer.Reset(time.Duration(provider.RefreshConn))
 	return
 }
 
