@@ -39,7 +39,7 @@ import (
 // CircuitBreaker is http.Handler that implements circuit breaker pattern
 type CircuitBreaker struct {
 	m       *sync.RWMutex
-	metrics *memmetrics.RTMetrics
+	Metrics *memmetrics.RTMetrics
 
 	condition hpredicate
 
@@ -94,7 +94,7 @@ func New(next http.Handler, expression string, options ...CircuitBreakerOption) 
 	if err != nil {
 		return nil, err
 	}
-	cb.metrics = mt
+	cb.Metrics = mt
 
 	return cb, nil
 }
@@ -156,7 +156,7 @@ func (c *CircuitBreaker) serve(w http.ResponseWriter, req *http.Request) {
 	c.next.ServeHTTP(p, req)
 
 	latency := c.clock.UtcNow().Sub(start)
-	c.metrics.Record(p.Code, latency)
+	c.Metrics.Record(p.Code, latency)
 
 	// Note that this call is less expensive than it looks -- checkCondition only performs the real check
 	// periodically. Because of that we can afford to call it here on every single response.
@@ -234,7 +234,7 @@ func (c *CircuitBreaker) checkAndSet() {
 	}
 
 	c.setState(stateTripped, c.clock.UtcNow().Add(c.fallbackDuration))
-	c.metrics.Reset()
+	c.Metrics.Reset()
 }
 
 func (c *CircuitBreaker) setRecovering() {

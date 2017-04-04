@@ -47,7 +47,7 @@ type toFloat64 func(c *CircuitBreaker) float64
 
 func latencyAtQuantile(quantile float64) toInt {
 	return func(c *CircuitBreaker) int {
-		h, err := c.metrics.LatencyHistogram()
+		h, err := c.Metrics.LatencyHistogram()
 		if err != nil {
 			c.log.Errorf("Failed to get latency histogram, for %v error: %v", c, err)
 			return 0
@@ -58,13 +58,13 @@ func latencyAtQuantile(quantile float64) toInt {
 
 func networkErrorRatio() toFloat64 {
 	return func(c *CircuitBreaker) float64 {
-		return c.metrics.NetworkErrorRatio()
+		return c.Metrics.NetworkErrorRatio()
 	}
 }
 
 func responseCodeRatio(startA, endA, startB, endB int) toFloat64 {
 	return func(c *CircuitBreaker) float64 {
-		return c.metrics.ResponseCodeRatio(startA, endA, startB, endB)
+		return c.Metrics.ResponseCodeRatio(startA, endA, startB, endB)
 	}
 }
 

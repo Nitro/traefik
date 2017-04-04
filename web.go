@@ -7,6 +7,7 @@ import (
 	"io/ioutil"
 	"net/http"
 	"runtime"
+	"time"
 
 	"github.com/codegangsta/negroni"
 	"github.com/containous/mux"
@@ -122,6 +123,8 @@ func (provider *WebProvider) Provide(configurationChan chan<- types.ConfigMessag
 	systemRouter.Methods("GET").Path(provider.Path + "api/providers/{provider}/frontends/{frontend}/routes").HandlerFunc(provider.getRoutesHandler)
 	systemRouter.Methods("GET").Path(provider.Path + "api/providers/{provider}/frontends/{frontend}/routes/{route}").HandlerFunc(provider.getRouteHandler)
 
+	systemRouter.Methods("GET").Path(provider.Path + "api/stats").HandlerFunc(provider.getStatsHandler)
+
 	// Expose dashboard
 	systemRouter.Methods("GET").Path(provider.Path).HandlerFunc(func(response http.ResponseWriter, request *http.Request) {
 		http.Redirect(response, request, provider.Path+"dashboard/", 302)
@@ -163,6 +166,68 @@ func (provider *WebProvider) Provide(configurationChan chan<- types.ConfigMessag
 type healthResponse struct {
 	*thoas_stats.Data
 	*middlewares.Stats
+}
+
+type CBStats struct {
+	Backend            string
+	State              string
+	Lat25Quant         time.Duration
+	Lat50Quant         time.Duration
+	Lat75Quant         time.Duration
+	NetErrorRatio      float64
+	StatusCodeCounts   map[int]int64
+	CurrentConnections map[string]int64
+}
+
+func (provider *WebProvider) getStatsHandler(response http.ResponseWriter, request *http.Request) {
+	var stats []*CBStats
+	for server := range provider.server.connsStats {
+		state := provider.server.connsStats[server].GetStats()
+		histo, err := state.Metrics.LatencyHistogram()
+		if err != nil {
+			log.Errorf("Error collecting histogram %+v", err)
+			http.Error(response, fmt.Sprintf("%+v", err), http.StatusBadRequest)
+		}
+		srvStats := &CBStats{Backend: server,
+			State:              state.CBState,
+			Lat25Quant:         histo.LatencyAtQuantile(25),
+			Lat50Quant:         histo.LatencyAtQuantile(50),
+			Lat75Quant:         histo.LatencyAtQuantile(75),
+			NetErrorRatio:      state.Metrics.NetworkErrorRatio(),
+			StatusCodeCounts:   state.Metrics.StatusCodesCounts(),
+			CurrentConnections: state.Conns,
+		}
+		stats = append(stats, srvStats)
+	}
+
+	jsonBytes, err := json.MarshalIndent(&stats, "", "  ")
+	if err != nil {
+		log.Errorf("Error marshaling state in servicesHandler: %s", err.Error())
+		sendJsonError(response, 500, "Internal server error")
+		return
+	}
+
+	response.Write(jsonBytes)
+	//templatesRenderer.JSON(response, http.StatusOK, stats)
+}
+
+func sendJsonError(response http.ResponseWriter, status int, message string) {
+	output := map[string]string{
+		"status":  "error",
+		"message": message,
+	}
+
+	jsonBytes, err := json.Marshal(output)
+
+	if err != nil {
+		log.Errorf("Error encoding json error response: %s", err.Error())
+		response.WriteHeader(500)
+		response.Write([]byte("Interval server error"))
+		return
+	}
+
+	response.WriteHeader(status)
+	response.Write(jsonBytes)
 }
 
 func (provider *WebProvider) getHealthHandler(response http.ResponseWriter, request *http.Request) {

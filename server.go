@@ -53,6 +53,7 @@ type Server struct {
 	loggerMiddleware           *middlewares.Logger
 	routinesPool               *safe.Pool
 	leadership                 *cluster.Leadership
+	connsStats                 map[string]*middlewares.CircuitBreaker
 }
 
 type serverEntryPoints map[string]*serverEntryPoint
@@ -88,6 +89,7 @@ func NewServer(globalConfiguration GlobalConfiguration) *Server {
 		// leadership creation if cluster mode
 		server.leadership = cluster.NewLeadership(server.routinesPool.Ctx(), globalConfiguration.Cluster)
 	}
+	server.connsStats = make(map[string]*middlewares.CircuitBreaker)
 
 	return server
 }
@@ -751,6 +753,7 @@ func (server *Server) loadConfig(configurations configs, globalConfiguration Glo
 								continue frontend
 							}
 							negroni.Use(cbreaker)
+							server.connsStats[frontend.Backend] = cbreaker
 						} else {
 							negroni.UseHandler(lb)
 						}
