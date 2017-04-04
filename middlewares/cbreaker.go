@@ -52,8 +52,10 @@ func (cb *CircuitBreaker) release(url string) {
 func (cb *CircuitBreaker) GetStats() *CBStats {
 	connsMap := make(map[string]int64)
 	currState := &CBStats{cb.circuitBreaker.String(), cb.circuitBreaker.Metrics, connsMap}
-	cb.mutex.RLock()
-	defer cb.mutex.RUnlock()
-	currState.Conns = cb.conns
+
+	//don't bother with a mutex for copying the map.  We don't want to block traffic for this
+	for k, v := range cb.conns {
+		currState.Conns[k] = v
+	}
 	return currState
 }

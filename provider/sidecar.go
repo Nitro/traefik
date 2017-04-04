@@ -25,7 +25,7 @@ const (
 	method         = "wrr"
 	weight         = 1
 	sticky         = false
-	circuitBreaker = "ResponseCodeRatio(500, 600, 0, 600) > 0.3"
+	circuitBreaker = "ResponseCodeRatio(500, 600, 0, 600) > 0.9"
 )
 
 var _ Provider = (*Sidecar)(nil)
