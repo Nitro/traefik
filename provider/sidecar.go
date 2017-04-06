@@ -22,10 +22,9 @@ import (
 )
 
 const (
-	method         = "wrr"
-	weight         = 1
-	sticky         = false
-	circuitBreaker = "ResponseCodeRatio(500, 600, 0, 600) > 0.3"
+	method = "wrr"
+	weight = 0
+	sticky = false
 )
 
 var _ Provider = (*Sidecar)(nil)
@@ -190,8 +189,7 @@ func (provider *Sidecar) makeBackends(sidecarStates map[string][]*service.Servic
 	for serviceName, services := range sidecarStates {
 		newServers := make(map[string]types.Server)
 		newBackend := &types.Backend{LoadBalancer: &types.LoadBalancer{Method: method, Sticky: sticky},
-			CircuitBreaker: &types.CircuitBreaker{Expression: circuitBreaker},
-			Servers:        newServers}
+			Servers: newServers}
 		for _, serv := range services {
 			if serv.IsAlive() {
 				for i := 0; i < len(serv.Ports); i++ {
