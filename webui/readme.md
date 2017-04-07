@@ -7,6 +7,7 @@ Access to Træfɪk Web UI, ex: http://localhost:8080
 Træfɪk Web UI provide 2 types of informations:
 - Providers with their backends and frontends information.
 - Health of the web server.
+- Connection stats for each backend.
 
 ## How to build (for backends developer)
 
@@ -55,6 +56,7 @@ make generate-webui  # Generate static contents in `traefik/static/` folder.
 - Træfɪk API connections are defined in:
   - `webui/src/app/core/health.resource.js`
   - `webui/src/app/core/providers.resource.js`
+  - `webui/src/app/core/conn_stats.resource.js`
 
 - The pages contents are in the directory `webui/src/app/sections`.
 
