@@ -4,6 +4,7 @@ require('nvd3');
 var ndv3 = require('angular-nvd3');
 var traefikSectionHealth = require('./health/health.module');
 var traefikSectionProviders = require('./providers/providers.module');
+var traefikSectionConnStats = require('./conn_stats/conn_stats.module');
 
 var traefikSection = 'traefik.section';
 module.exports = traefikSection;
@@ -14,7 +15,8 @@ angular
     'ui.bootstrap',
     ndv3,
     traefikSectionProviders,
-    traefikSectionHealth
+    traefikSectionHealth,
+    traefikSectionConnStats
    ])
   .config(config);
 

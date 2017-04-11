@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"io/ioutil"
 	"net/http"
+	"reflect"
 	"runtime"
 
 	"github.com/codegangsta/negroni"
@@ -20,6 +21,7 @@ import (
 	"github.com/prometheus/client_golang/prometheus/promhttp"
 	thoas_stats "github.com/thoas/stats"
 	"github.com/unrolled/render"
+	"github.com/vulcand/oxy/connlimit"
 )
 
 var (
@@ -121,6 +123,10 @@ func (provider *WebProvider) Provide(configurationChan chan<- types.ConfigMessag
 	systemRouter.Methods("GET").Path(provider.Path + "api/providers/{provider}/frontends/{frontend}").HandlerFunc(provider.getFrontendHandler)
 	systemRouter.Methods("GET").Path(provider.Path + "api/providers/{provider}/frontends/{frontend}/routes").HandlerFunc(provider.getRoutesHandler)
 	systemRouter.Methods("GET").Path(provider.Path + "api/providers/{provider}/frontends/{frontend}/routes/{route}").HandlerFunc(provider.getRouteHandler)
+
+	// Expose connection stats
+	systemRouter.Methods("GET").Path(provider.Path + "api/conn_stats").HandlerFunc(provider.getConnStatsHandler)
+	systemRouter.Methods("GET").Path(provider.Path + "api/providers/{provider}/backends/{backend}/conn_stats").HandlerFunc(provider.getBackendConnStatsHandler)
 
 	// Expose dashboard
 	systemRouter.Methods("GET").Path(provider.Path).HandlerFunc(func(response http.ResponseWriter, request *http.Request) {
@@ -329,4 +335,79 @@ func expvarHandler(w http.ResponseWriter, r *http.Request) {
 		fmt.Fprintf(w, "%q: %s", kv.Key, kv.Value)
 	})
 	fmt.Fprintf(w, "\n}\n")
+}
+
+type connStats struct {
+	MaxConn   int64 `json:"max_conn"`
+	TotalConn int64 `json:"total_conn"`
+}
+
+func (provider *WebProvider) getBackendConnStatsHandler(response http.ResponseWriter, request *http.Request) {
+	vars := mux.Vars(request)
+	providerID := vars["provider"]
+	backendID := vars["backend"]
+	currentConfigurations := provider.server.currentConfigurations.Get().(configs)
+	if providerConf, ok := currentConfigurations[providerID]; ok {
+		if backendConf, ok := providerConf.Backends[backendID]; ok {
+			if connLimiter, ok := provider.server.backendConnLimits[backendID]; ok {
+				if totalConn, ok := getTotalConn(connLimiter); ok {
+					templatesRenderer.JSON(response, http.StatusOK, &connStats{
+						MaxConn:   backendConf.MaxConn.Amount,
+						TotalConn: totalConn,
+					})
+					return
+				}
+			}
+		}
+	}
+
+	http.NotFound(response, request)
+}
+
+type providers struct {
+	Backends map[string]connStats `json:"backends"`
+}
+
+func (provider *WebProvider) getConnStatsHandler(response http.ResponseWriter, request *http.Request) {
+	payload := make(map[string]providers)
+
+	currentConfigurations := provider.server.currentConfigurations.Get().(configs)
+	for p := range currentConfigurations {
+		payload[p] = providers{
+			Backends: make(map[string]connStats),
+		}
+		for b := range currentConfigurations[p].Backends {
+			if connLimiter, ok := provider.server.backendConnLimits[b]; ok {
+				if totalConn, ok := getTotalConn(connLimiter); ok {
+					payload[p].Backends[b] = connStats{
+						MaxConn:   currentConfigurations[p].Backends[b].MaxConn.Amount,
+						TotalConn: totalConn,
+					}
+				}
+			}
+		}
+	}
+
+	templatesRenderer.JSON(response, http.StatusOK, payload)
+}
+
+func getTotalConn(cl *connlimit.ConnLimiter) (int64, bool) {
+	clPtr := reflect.ValueOf(cl)
+	if !clPtr.IsValid() && clPtr.Kind() != reflect.Ptr {
+		log.Debugf("Expecting Ptr type but got %s instead", clPtr.Kind())
+		return 0, false
+	}
+
+	clData := clPtr.Elem()
+	if !clData.IsValid() && clData.Kind() != reflect.Struct {
+		log.Debugf("Expecting Struct type but got %s instead", clData.Kind())
+		return 0, false
+	}
+
+	totalConnField := clData.FieldByName("totalConnections")
+	if !totalConnField.IsValid() && totalConnField.Kind() != reflect.Int64 {
+		log.Debugf("Expecting Int64 type but got %s instead", totalConnField.Kind())
+		return 0, false
+	}
+	return totalConnField.Int(), true
 }
