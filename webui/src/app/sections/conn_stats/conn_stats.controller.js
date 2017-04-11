@@ -5,9 +5,9 @@ var d3 = require('d3');
 function ConnStatsController($scope, $interval, $log, $filter, ConnStats) {
   var vm = this,
     refreshInterval = 2000, // milliseconds
-    // Store and display data for the past hour
-    maxHistoricDataPointCount = 3600 / (refreshInterval / 1000),
-    dataPointStorageTime = 3600 * 1000;
+    // Store and display data for the past 30 minutes
+    maxHistoricDataPointCount = 1800 / (refreshInterval / 1000),
+    dataPointStorageTime = 1800 * 1000;
 
   vm.graph = {
     historicalConnCount: {},
@@ -101,7 +101,7 @@ function ConnStatsController($scope, $interval, $log, $filter, ConnStats) {
       // Remove dead entries
       if (values.length == 0 ||
           values[values.length - 1].lastUpdated < Date.now() - dataPointStorageTime) {
-        
+
         vm.graph.historicalConnCount.data.splice(i, 1);
       }
     }
@@ -111,7 +111,7 @@ function ConnStatsController($scope, $interval, $log, $filter, ConnStats) {
     vm.graph.currentConnCount.data = [{
       values: []
     }];
-    
+
     angular.forEach(vm.connStats, function(provider, providerId) {
       angular.forEach(provider.backends, function(backend, backendId) {
         var dataPointLabel = providerId + '/' + backendId,
