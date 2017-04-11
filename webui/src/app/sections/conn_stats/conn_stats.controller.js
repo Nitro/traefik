@@ -44,18 +44,18 @@ function ConnStatsController($scope, $interval, $log, $filter, ConnStats) {
   vm.graph.currentConnCount.options = {
     chart: {
       type: 'discreteBarChart',
-      height: 300,
+      height: 500,
       margin: {
         top: 20,
         right: 40,
-        bottom: 40,
+        bottom: 240,
         left: 55
       },
       x: function(d) { return d.label; },
       y: function(d) { return d.value; },
       valueFormat: d3.format('d'),
       showValues: true,
-      staggerLabels: true
+      rotateLabels: 90
     },
     title: {
       enable: true,
