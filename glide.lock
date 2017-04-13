@@ -1,5 +1,5 @@
-hash: 2abed980e61ff7659b181849419aadcb8d9d63594a5ac3215d09df0ea12a1700
-updated: 2017-04-11T17:02:21.540487905+02:00
+hash: 10d4f5988aabcae824802eaba4ec35512453559752a0333969b94c2e69a0d7e5
+updated: 2017-04-13T16:14:00.147796817+01:00
 imports:
 - name: cloud.google.com/go
   version: 2e6a95edb1071d750f6d7db777bf66cd2997af6c
@@ -8,6 +8,8 @@ imports:
   - internal
 - name: github.com/abbot/go-http-auth
   version: d45c47bedec736d172957bd394786b76626fa8ac
+- name: github.com/armon/go-metrics
+  version: 06b60999766278efd6d2b5d8418a58c3d5b99e87
 - name: github.com/ArthurHlt/go-eureka-client
   version: 9d0a49cbd39aa3634ae1977e9f519a262b10adaf
   subpackages:
@@ -93,13 +95,11 @@ imports:
 - name: github.com/coreos/etcd
   version: c400d05d0aa73e21e431c16145e558d624098018
   subpackages:
-  - Godeps/_workspace/src/github.com/coreos/go-systemd/journal
-  - Godeps/_workspace/src/github.com/coreos/pkg/capnslog
+  - Godeps/_workspace/src/github.com/ugorji/go/codec
+  - Godeps/_workspace/src/golang.org/x/net/context
   - client
-  - pkg/fileutil
   - pkg/pathutil
   - pkg/types
-  - version
 - name: github.com/coreos/go-oidc
   version: 5644a2f50e2d2d5ba0b474bc5bc55fea1925936d
   subpackages:
@@ -138,7 +138,28 @@ imports:
 - name: github.com/docker/docker
   version: 49bf474f9ed7ce7143a59d1964ff7b7fd9b52178
   subpackages:
+  - api/types
+  - api/types/blkiodev
+  - api/types/container
+  - api/types/filters
+  - api/types/mount
+  - api/types/network
+  - api/types/registry
+  - api/types/strslice
+  - api/types/swarm
+  - api/types/versions
   - namesgenerator
+  - opts
+  - pkg/archive
+  - pkg/fileutils
+  - pkg/homedir
+  - pkg/idtools
+  - pkg/ioutils
+  - pkg/longpath
+  - pkg/pools
+  - pkg/promise
+  - pkg/stdcopy
+  - pkg/system
 - name: github.com/docker/engine-api
   version: 3d1601b9d2436a70b0dfc045a23f6503d19195df
   subpackages:
@@ -198,6 +219,8 @@ imports:
   - swagger
 - name: github.com/fatih/color
   version: 9131ab34cf20d2f6d83fdc67168a5430d1c7dc23
+- name: github.com/fsouza/go-dockerclient
+  version: 3134ad4ea8f8a04974cde3ef3958e265c605b0c1
 - name: github.com/gambol99/go-marathon
   version: 6b00a5b651b1beb2c6821863f7c60df490bd46c8
 - name: github.com/ghodss/yaml
@@ -230,7 +253,7 @@ imports:
   subpackages:
   - proto
 - name: github.com/google/go-github
-  version: 6896997c7c9fe603fb9d2e8e92303bb18481e60a
+  version: de33c46a823d3f723514fc5333b75ef2e937b7df
   subpackages:
   - github
 - name: github.com/google/go-querystring
@@ -246,25 +269,37 @@ imports:
 - name: github.com/gorilla/websocket
   version: a91eba7f97777409bc2c443f5534d41dd20c5720
 - name: github.com/hashicorp/consul
-  version: 3f92cc70e8163df866873c16c6d89889b5c95fc4
+  version: a44c50eaf11944605cc2cfcca9e5de22edfe4ac9
   subpackages:
   - api
+- name: github.com/hashicorp/errwrap
+  version: 7554cd9344cec97297fa6649b055a8c98c2a1e55
 - name: github.com/hashicorp/go-cleanhttp
-  version: 3573b8b52aa7b37b9358d966a898feb387f62437
+  version: ad28ea4487f05916463e2423a55166280e8254b5
+- name: github.com/hashicorp/go-msgpack
+  version: fa3f63826f7c23912c15263591e65d54d080b458
+  subpackages:
+  - codec
+- name: github.com/hashicorp/go-multierror
+  version: d30f09973e19c1dfcd120b2d9c4f168e68d6b5d5
 - name: github.com/hashicorp/go-version
   version: 03c5bf6be031b6dd45afec16b1cf94fc8938bc77
 - name: github.com/hashicorp/serf
-  version: 19f2c401e122352c047a84d6584dd51e2fb8fcc4
+  version: 3d6a974239f0b515c87479d5beefe575ad866805
   subpackages:
   - coordinate
 - name: github.com/JamesClonk/vultr
   version: 0f156dd232bc4ebf8a32ba83fec57c0e4c9db69f
   subpackages:
   - lib
+- name: github.com/jarcoal/httpmock
+  version: 4442edb3db31196622da56482fd8d0fa375fba4d
 - name: github.com/jmespath/go-jmespath
   version: bd40a432e4c76585ef6b72d3fd96fb9b6dc7b68d
 - name: github.com/jonboulle/clockwork
   version: 72f9bd7c4e0c2a40055ab3d0f09654f730cce982
+- name: github.com/jtolds/gls
+  version: 9a4a02dbe491bef4bab3c24fd9f3087d6c4c6690
 - name: github.com/juju/ratelimit
   version: 77ed1c8a01217656d2080ad51981f6e99adaa177
 - name: github.com/mailgun/timetools
@@ -284,7 +319,7 @@ imports:
 - name: github.com/mattn/go-shellwords
   version: 02e3cf038dcea8290e44424da473dd12be796a8a
 - name: github.com/matttproud/golang_protobuf_extensions
-  version: c12348ce28de40eed0136aa2b644d0ee0650e56c
+  version: fc2b8d3a73c4867e51861bbdd5ae3c1f0869dd6a
   subpackages:
   - pbutil
 - name: github.com/mesos/mesos-go
@@ -317,13 +352,22 @@ imports:
   version: 53818660ed4955e899c0bcafa97299a388bd7c8e
 - name: github.com/mvdan/xurls
   version: db96455566f05ffe42bd6ac671f05eeb1152b45d
+- name: github.com/Nitro/memberlist
+  version: 490eb18c36b5181b667a4cf41d05eabacd855aad
+- name: github.com/Nitro/sidecar
+  version: 2f5d357f0dce6d8f30acb1c5c281ba5a7075d4f7
+  subpackages:
+  - catalog
+  - output
+  - service
 - name: github.com/NYTimes/gziphandler
   version: 22d4470af89e09998fc16b35029df973932df4ae
 - name: github.com/ogier/pflag
   version: 45c278ab3607870051a2ea9040bb85fcb8557481
 - name: github.com/opencontainers/runc
-  version: 50401b5b4c2e01e4f1372b73a021742deeaf4e2d
+  version: c6a791bef906b0dfdf81e85b840bec475b8ec75e
   subpackages:
+  - libcontainer/system
   - libcontainer/user
 - name: github.com/ovh/go-ovh
   version: d2207178e10e4527e8f222fd8707982df8c3af17
@@ -368,6 +412,8 @@ imports:
   version: 5b8f6cc26b355ba03d7611fce3844155b7baf05b
   subpackages:
   - client
+- name: github.com/relistan/go-director
+  version: 9273dae8c839a114aa4472165f84e057d5b12e09
 - name: github.com/ryanuber/go-glob
   version: 256dc444b735e061061cf46c809487313d5b0065
 - name: github.com/samuel/go-zookeeper
@@ -378,6 +424,16 @@ imports:
   version: 879c5887cd475cd7864858769793b2ceb0d44feb
 - name: github.com/Sirupsen/logrus
   version: 10f801ebc38b33738c9d17d50860f484a0988ff5
+- name: github.com/smartystreets/assertions
+  version: edb6e295a22c57a2aa353b2f0729b6eff9f9f4b7
+  subpackages:
+  - internal/oglematchers
+- name: github.com/smartystreets/goconvey
+  version: 3c2572876754c4669ae7417b219f0b30a29b32c7
+  subpackages:
+  - convey
+  - convey/gotest
+  - convey/reporting
 - name: github.com/spf13/pflag
   version: 5ccb023bc27df288a957c5e994cd44fd19619465
 - name: github.com/streamrail/concurrent-map

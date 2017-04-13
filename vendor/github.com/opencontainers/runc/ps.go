@@ -10,68 +10,62 @@ import (
 	"strconv"
 	"strings"
 
-	"github.com/urfave/cli"
+	"github.com/codegangsta/cli"
 )
 
 var psCommand = cli.Command{
 	Name:      "ps",
 	Usage:     "ps displays the processes running inside a container",
-	ArgsUsage: `<container-id> [ps options]`,
+	ArgsUsage: `<container-id> <ps options>`,
 	Flags: []cli.Flag{
 		cli.StringFlag{
 			Name:  "format, f",
-			Value: "table",
-			Usage: `select one of: ` + formatOptions,
+			Value: "",
+			Usage: `select one of: ` + formatOptions + `.
+
+The default format is table.  The following will output the processes of a container
+in json format:
+
+    # runc ps -f json`,
 		},
 	},
-	Action: func(context *cli.Context) error {
-		if err := checkArgs(context, 1, minArgs); err != nil {
-			return err
-		}
-		// XXX: Currently not supported with rootless containers.
-		if isRootless() {
-			return fmt.Errorf("runc ps requires root")
-		}
-
+	Action: func(context *cli.Context) {
 		container, err := getContainer(context)
 		if err != nil {
-			return err
+			fatal(err)
 		}
 
-		pids, err := container.Processes()
+		if context.String("format") == "json" {
+			pids, err := container.Processes()
+			if err != nil {
+				fatal(err)
+			}
+			if err := json.NewEncoder(os.Stdout).Encode(pids); err != nil {
+				fatal(err)
+			}
+			return
+		}
+
+		psArgs := context.Args().Get(1)
+		if psArgs == "" {
+			psArgs = "-ef"
+		}
+
+		output, err := exec.Command("ps", strings.Split(psArgs, " ")...).Output()
 		if err != nil {
-			return err
-		}
-
-		switch context.String("format") {
-		case "table":
-		case "json":
-			return json.NewEncoder(os.Stdout).Encode(pids)
-		default:
-			return fmt.Errorf("invalid format option")
-		}
-
-		// [1:] is to remove command name, ex:
-		// context.Args(): [containet_id ps_arg1 ps_arg2 ...]
-		// psArgs:         [ps_arg1 ps_arg2 ...]
-		//
-		psArgs := context.Args()[1:]
-		if len(psArgs) == 0 {
-			psArgs = []string{"-ef"}
-		}
-
-		cmd := exec.Command("ps", psArgs...)
-		output, err := cmd.CombinedOutput()
-		if err != nil {
-			return fmt.Errorf("%s: %s", err, output)
+			fatal(err)
 		}
 
 		lines := strings.Split(string(output), "\n")
 		pidIndex, err := getPidIndex(lines[0])
 		if err != nil {
-			return err
+			fatal(err)
 		}
 
+		pids, err := container.Processes()
+		if err != nil {
+			fatal(err)
+		}
 		fmt.Println(lines[0])
 		for _, line := range lines[1:] {
 			if len(line) == 0 {
@@ -80,7 +74,7 @@ var psCommand = cli.Command{
 			fields := strings.Fields(line)
 			p, err := strconv.Atoi(fields[pidIndex])
 			if err != nil {
-				return fmt.Errorf("unexpected pid '%s': %s", fields[pidIndex], err)
+				fatal(fmt.Errorf("unexpected pid '%s': %s", fields[pidIndex], err))
 			}
 
 			for _, pid := range pids {
@@ -90,9 +84,7 @@ var psCommand = cli.Command{
 				}
 			}
 		}
-		return nil
 	},
-	SkipArgReorder: true,
 }
 
 func getPidIndex(title string) (int, error) {

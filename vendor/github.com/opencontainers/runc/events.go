@@ -4,15 +4,14 @@ package main
 
 import (
 	"encoding/json"
-	"fmt"
 	"os"
 	"sync"
 	"time"
 
 	"github.com/Sirupsen/logrus"
+	"github.com/codegangsta/cli"
 	"github.com/opencontainers/runc/libcontainer"
 	"github.com/opencontainers/runc/libcontainer/cgroups"
-	"github.com/urfave/cli"
 )
 
 // event struct for encoding the event data to json.
@@ -24,7 +23,7 @@ type event struct {
 
 // stats is the runc specific stats structure for stability when encoding and decoding stats.
 type stats struct {
-	CPU     cpu                `json:"cpu"`
+	Cpu     cpu                `json:"cpu"`
 	Memory  memory             `json:"memory"`
 	Pids    pids               `json:"pids"`
 	Blkio   blkio              `json:"blkio"`
@@ -107,24 +106,17 @@ information is displayed once every 5 seconds.`,
 		cli.DurationFlag{Name: "interval", Value: 5 * time.Second, Usage: "set the stats collection interval"},
 		cli.BoolFlag{Name: "stats", Usage: "display the container's stats then exit"},
 	},
-	Action: func(context *cli.Context) error {
-		if err := checkArgs(context, 1, exactArgs); err != nil {
-			return err
-		}
+	Action: func(context *cli.Context) {
 		container, err := getContainer(context)
 		if err != nil {
-			return err
-		}
-		duration := context.Duration("interval")
-		if duration <= 0 {
-			return fmt.Errorf("duration interval must be greater than 0")
+			fatal(err)
 		}
 		status, err := container.Status()
 		if err != nil {
-			return err
+			fatal(err)
 		}
-		if status == libcontainer.Stopped {
-			return fmt.Errorf("container with id %s is not running", container.ID())
+		if status == libcontainer.Destroyed {
+			fatalf("container with id %s is not running", container.ID())
 		}
 		var (
 			stats  = make(chan *libcontainer.Stats, 1)
@@ -144,12 +136,12 @@ information is displayed once every 5 seconds.`,
 		if context.Bool("stats") {
 			s, err := container.Stats()
 			if err != nil {
-				return err
+				fatal(err)
 			}
 			events <- &event{Type: "stats", ID: container.ID(), Data: convertLibcontainerStats(s)}
 			close(events)
 			group.Wait()
-			return nil
+			return
 		}
 		go func() {
 			for range time.Tick(context.Duration("interval")) {
@@ -163,7 +155,7 @@ information is displayed once every 5 seconds.`,
 		}()
 		n, err := container.NotifyOOM()
 		if err != nil {
-			return err
+			fatal(err)
 		}
 		for {
 			select {
@@ -185,7 +177,6 @@ information is displayed once every 5 seconds.`,
 			}
 		}
 		group.Wait()
-		return nil
 	},
 }
 
@@ -198,13 +189,13 @@ func convertLibcontainerStats(ls *libcontainer.Stats) *stats {
 	s.Pids.Current = cg.PidsStats.Current
 	s.Pids.Limit = cg.PidsStats.Limit
 
-	s.CPU.Usage.Kernel = cg.CpuStats.CpuUsage.UsageInKernelmode
-	s.CPU.Usage.User = cg.CpuStats.CpuUsage.UsageInUsermode
-	s.CPU.Usage.Total = cg.CpuStats.CpuUsage.TotalUsage
-	s.CPU.Usage.Percpu = cg.CpuStats.CpuUsage.PercpuUsage
-	s.CPU.Throttling.Periods = cg.CpuStats.ThrottlingData.Periods
-	s.CPU.Throttling.ThrottledPeriods = cg.CpuStats.ThrottlingData.ThrottledPeriods
-	s.CPU.Throttling.ThrottledTime = cg.CpuStats.ThrottlingData.ThrottledTime
+	s.Cpu.Usage.Kernel = cg.CpuStats.CpuUsage.UsageInKernelmode
+	s.Cpu.Usage.User = cg.CpuStats.CpuUsage.UsageInUsermode
+	s.Cpu.Usage.Total = cg.CpuStats.CpuUsage.TotalUsage
+	s.Cpu.Usage.Percpu = cg.CpuStats.CpuUsage.PercpuUsage
+	s.Cpu.Throttling.Periods = cg.CpuStats.ThrottlingData.Periods
+	s.Cpu.Throttling.ThrottledPeriods = cg.CpuStats.ThrottlingData.ThrottledPeriods
+	s.Cpu.Throttling.ThrottledTime = cg.CpuStats.ThrottlingData.ThrottledTime
 
 	s.Memory.Cache = cg.MemoryStats.Cache
 	s.Memory.Kernel = convertMemoryEntry(cg.MemoryStats.KernelUsage)

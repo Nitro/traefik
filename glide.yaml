@@ -146,3 +146,38 @@ import:
   version: 9af46dd5a1713e8b5cd71106287eba3cefdde50b
 - package: google.golang.org/grpc
   version: v1.2.0
+- package: github.com/prometheus/client_golang
+  version: 08fd2e12372a66e68e30523c7642e0cbc3e4fbde
+  subpackages:
+  - prometheus
+  - prometheus/promhttp
+- package: github.com/prometheus/client_model
+  version: 6f3806018612930941127f2a7c6c453ba2c527d2
+  subpackages:
+  - go
+- package: github.com/prometheus/common
+  version: 49fee292b27bfff7f354ee0f64e1bc4850462edf
+  subpackages:
+  - expfmt
+  - internal/bitbucket.org/ww/goautoneg
+  - model
+- package: github.com/prometheus/procfs
+  version: a1dba9ce8baed984a2495b658c82687f8157b98f
+  subpackages:
+  - xfs
+- package: github.com/jarcoal/httpmock
+  version: 4442edb3db31196622da56482fd8d0fa375fba4d
+- package: github.com/smartystreets/assertions
+  version: edb6e295a22c57a2aa353b2f0729b6eff9f9f4b7
+  subpackages:
+  - internal/oglematchers
+- package: github.com/smartystreets/goconvey
+  version: 3c2572876754c4669ae7417b219f0b30a29b32c7
+  subpackages:
+  - convey
+  - convey/gotest
+  - convey/reporting
+- package: github.com/jtolds/gls
+  version: 9a4a02dbe491bef4bab3c24fd9f3087d6c4c6690
+- package: github.com/Nitro/sidecar
+  version: 2f5d357f0dce6d8f30acb1c5c281ba5a7075d4f7
