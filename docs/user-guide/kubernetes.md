@@ -12,7 +12,7 @@ on your machine, as it is the quickest way to get a local Kubernetes cluster set
 
 2. The `kubectl` binary should be [installed on your workstation](http://kubernetes.io/docs/getting-started-guides/minikube/#download-kubectl).
 
-## Deploy Træfɪk
+## Deploy Træfik using a Deployment object
 
 We are going to deploy Træfɪk with a
 [Deployment](http://kubernetes.io/docs/user-guide/deployments/), as this will
@@ -67,6 +67,64 @@ To deploy Træfɪk to your cluster start by submitting the deployment to the clu
 ```sh
 kubectl apply -f examples/k8s/traefik.yaml
 ```
+### Role Based Access Control configuration (optional)
+
+Kubernetes introduces [Role Based Access Control (RBAC)](https://kubernetes.io/docs/admin/authorization/) in 1.6+ to allow fine-grained control
+of Kubernetes resources and api.
+
+If your cluster is configured with RBAC, you need to authorize Traefik to use
+kubernetes API using ClusterRole, ServiceAccount and ClusterRoleBinding resources:
+
+```yaml
+---
+kind: ClusterRole
+apiVersion: rbac.authorization.k8s.io/v1beta1
+metadata:
+  name: traefik-ingress-controller
+rules:
+  - apiGroups:
+      - ""
+    resources:
+      - pods
+      - services
+      - endpoints
+    verbs:
+      - get
+      - list
+      - watch
+  - apiGroups:
+      - extensions
+    resources:
+      - ingresses
+    verbs:
+      - get
+      - list
+      - watch
+---
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: traefik-ingress-controller
+  namespace: kube-system
+---
+kind: ClusterRoleBinding
+apiVersion: rbac.authorization.k8s.io/v1beta1
+metadata:
+  name: traefik-ingress-controller
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: ClusterRole
+  name: traefik-ingress-controller
+subjects:
+- kind: ServiceAccount
+  name: traefik-ingress-controller
+  namespace: kube-system
+```
+
+Then you add the service account information to Traefik deployment spec:
+  `serviceAccountName: traefik-ingress-controller`
+
+[examples/k8s/traefik-with-rbac.yaml](https://github.com/containous/traefik/tree/master/examples/k8s/traefik-with-rbac.yaml)
 
 ### Check the deployment
 
@@ -99,6 +157,18 @@ curl $(minikube ip)
 ```
 
 > We expect to see a 404 response here as we haven't yet given Træfɪk any configuration.
+
+## Deploy Træfik using Helm Chart
+
+Instead of installing Træfik via a Deployment object, you can also use the Træfik Helm chart.
+
+Install Træfik chart by:
+
+```sh
+helm install stable/traefik
+```
+
+For more information, check out [the doc](https://github.com/kubernetes/charts/tree/master/stable/traefik).
 
 ## Submitting An Ingress to the cluster.
 
