@@ -672,7 +672,7 @@ func (server *Server) loadConfig(configurations configs, globalConfiguration Glo
 											interval = time.Second * 30
 										}
 									}
-									backendsHealthcheck[frontend.Backend] = healthcheck.NewBackendHealthCheck(configuration.Backends[frontend.Backend].HealthCheck.URL, interval, rebalancer)
+									backendsHealthcheck[frontend.Backend] = healthcheck.NewBackendHealthCheck(configuration.Backends[frontend.Backend].HealthCheck.Path, interval, rebalancer)
 								}
 							}
 						case types.Wrr:
@@ -706,7 +706,7 @@ func (server *Server) loadConfig(configurations configs, globalConfiguration Glo
 										interval = time.Second * 30
 									}
 								}
-								backendsHealthcheck[frontend.Backend] = healthcheck.NewBackendHealthCheck(configuration.Backends[frontend.Backend].HealthCheck.URL, interval, rr)
+								backendsHealthcheck[frontend.Backend] = healthcheck.NewBackendHealthCheck(configuration.Backends[frontend.Backend].HealthCheck.Path, interval, rr)
 							}
 						}
 						maxConns := configuration.Backends[frontend.Backend].MaxConn
@@ -717,7 +717,7 @@ func (server *Server) loadConfig(configurations configs, globalConfiguration Glo
 								log.Errorf("Skipping frontend %s...", frontendName)
 								continue frontend
 							}
-							log.Debugf("Creating loadd-balancer connlimit")
+							log.Debugf("Creating load-balancer connlimit")
 							lb, err = connlimit.New(lb, extractFunc, maxConns.Amount, connlimit.Logger(oxyLogger))
 							if err != nil {
 								log.Errorf("Error creating connlimit: %v", err)

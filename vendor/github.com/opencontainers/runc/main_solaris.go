@@ -2,7 +2,7 @@
 
 package main
 
-import "github.com/urfave/cli"
+import "github.com/codegangsta/cli"
 
 var (
 	checkpointCommand cli.Command

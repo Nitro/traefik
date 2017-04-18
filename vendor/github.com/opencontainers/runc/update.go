@@ -8,9 +8,8 @@ import (
 	"os"
 	"strconv"
 
-	"github.com/docker/go-units"
+	"github.com/codegangsta/cli"
 	"github.com/opencontainers/runtime-spec/specs-go"
-	"github.com/urfave/cli"
 )
 
 func u64Ptr(i uint64) *uint64 { return &i }
@@ -24,7 +23,7 @@ var updateCommand = cli.Command{
 		cli.StringFlag{
 			Name:  "resources, r",
 			Value: "",
-			Usage: `path to the file containing the resources to update or '-' to read from the standard input
+			Usage: `path to the file containing the resources to update or '-' to read from the standard input.
 
 The accepted format is as follow (unchanged values can be omitted):
 
@@ -33,8 +32,7 @@ The accepted format is as follow (unchanged values can be omitted):
     "limit": 0,
     "reservation": 0,
     "swap": 0,
-    "kernel": 0,
-    "kernelTCP": 0
+    "kernel": 0
   },
   "cpu": {
     "shares": 0,
@@ -55,15 +53,15 @@ other options are ignored.
 
 		cli.IntFlag{
 			Name:  "blkio-weight",
-			Usage: "Specifies per cgroup weight, range is from 10 to 1000",
+			Usage: "Specifies per cgroup weight, range is from 10 to 1000.",
 		},
 		cli.StringFlag{
 			Name:  "cpu-period",
-			Usage: "CPU period to be used for hardcapping (in usecs). 0 to use system default",
+			Usage: "CPU period to be used for hardcapping (in usecs). 0 to use system default.",
 		},
 		cli.StringFlag{
 			Name:  "cpu-quota",
-			Usage: "CPU hardcap limit (in usecs). Allowed cpu time in a given period",
+			Usage: "CPU hardcap limit (in usecs). Allowed cpu time in a given period.",
 		},
 		cli.StringFlag{
 			Name:  "cpu-share",
@@ -95,13 +93,13 @@ other options are ignored.
 		},
 		cli.StringFlag{
 			Name:  "memory-swap",
-			Usage: "Total memory usage (memory + swap); set '-1' to enable unlimited swap",
+			Usage: "Total memory usage (memory + swap); set `-1` to enable unlimited swap",
 		},
 	},
-	Action: func(context *cli.Context) error {
+	Action: func(context *cli.Context) {
 		container, err := getContainer(context)
 		if err != nil {
-			return err
+			fatal(err)
 		}
 
 		r := specs.Resources{
@@ -137,12 +135,12 @@ other options are ignored.
 			default:
 				f, err = os.Open(in)
 				if err != nil {
-					return err
+					fatal(err)
 				}
 			}
 			err = json.NewDecoder(f).Decode(&r)
 			if err != nil {
-				return err
+				fatal(err)
 			}
 		} else {
 			if val := context.Int("blkio-weight"); val != 0 {
@@ -156,20 +154,9 @@ other options are ignored.
 			}
 
 			for opt, dest := range map[string]*uint64{
-				"cpu-period": r.CPU.Period,
-				"cpu-quota":  r.CPU.Quota,
-				"cpu-share":  r.CPU.Shares,
-			} {
-				if val := context.String(opt); val != "" {
-					var err error
-					*dest, err = strconv.ParseUint(val, 10, 64)
-					if err != nil {
-						return fmt.Errorf("invalid value for %s: %s", opt, err)
-					}
-				}
-			}
-
-			for opt, dest := range map[string]*uint64{
+				"cpu-period":         r.CPU.Period,
+				"cpu-quota":          r.CPU.Quota,
+				"cpu-share":          r.CPU.Shares,
 				"kernel-memory":      r.Memory.Kernel,
 				"kernel-memory-tcp":  r.Memory.KernelTCP,
 				"memory":             r.Memory.Limit,
@@ -177,11 +164,11 @@ other options are ignored.
 				"memory-swap":        r.Memory.Swap,
 			} {
 				if val := context.String(opt); val != "" {
-					v, err := units.RAMInBytes(val)
+					var err error
+					*dest, err = strconv.ParseUint(val, 10, 64)
 					if err != nil {
-						return fmt.Errorf("invalid value for %s: %s", opt, err)
+						fatal(fmt.Errorf("invalid value for %s: %s", opt, err))
 					}
-					*dest = uint64(v)
 				}
 			}
 		}
@@ -200,8 +187,7 @@ other options are ignored.
 		config.Cgroups.Resources.MemorySwap = int64(*r.Memory.Swap)
 
 		if err := container.Set(config); err != nil {
-			return err
+			fatal(err)
 		}
-		return nil
 	},
 }
