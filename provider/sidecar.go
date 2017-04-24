@@ -90,7 +90,7 @@ func (provider *Sidecar) Provide(configurationChan chan<- types.ConfigMessage, p
 				case event := <-watcher.Events:
 					if strings.Contains(event.Name, file.Name()) {
 						log.Debug("Sidecar config file event: ", event)
-						err := provider.reloadConfig()
+						err = provider.reloadConfig()
 						if err != nil {
 							log.Error(err)
 						}
