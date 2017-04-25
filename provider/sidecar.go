@@ -66,7 +66,7 @@ func (provider *Sidecar) Provide(configurationChan chan<- types.ConfigMessage, p
 
 	if provider.Watch {
 		safe.Go(func() {
-			provider.sidecarWatcher()
+			provider.runSidecarWatcher()
 		})
 
 		watcher, err := fsnotify.NewWatcher()
@@ -187,44 +187,46 @@ func (provider *Sidecar) loadConfig(sidecarStates map[string][]*service.Service)
 	return nil
 }
 
-func (provider *Sidecar) sidecarWatcher() {
+func (provider *Sidecar) runSidecarWatcher() {
 	// Set timeout to be just a bit more than connection refresh interval
 	provider.connTimer = time.NewTimer(time.Duration(provider.RefreshConn))
 
 	log.Debugf("Using %s Sidecar connection refresh interval", provider.RefreshConn)
 	for {
-		// Wrap code in an anonymous function because defer has function scope
-		func() {
-			// Use refresh interval to occasionally reconnect to Sidecar in case the stream connection is lost
-			req, err := http.NewRequest(http.MethodGet, provider.Endpoint+"/watch", nil)
-			if err != nil {
-				log.Errorf("Error creating http request to Sidecar instance '%s': %s", provider.Endpoint, err)
-				time.Sleep(5 * time.Second)
-				return
-			}
-
-			cx, cancel := context.WithCancel(context.Background())
-			// Cancel the infinite timeout request automatically after we reset connTimer
-			defer cancel()
-
-			req = req.WithContext(cx)
-
-			resp, err := watcherHTTPClient.Do(req)
-			if err != nil {
-				log.Errorf("Error connecting to Sidecar instance '%s': %s", provider.Endpoint, err)
-				time.Sleep(5 * time.Second)
-				return
-			}
-			defer resp.Body.Close()
-
-			safe.Go(func() { catalog.DecodeStream(resp.Body, provider.callbackLoader) })
-
-			// Wait on refresh connection timer. If this expires we haven't seen an update in a
-			// while and should cancel the request, reset the time, and reconnect just in case
-			<-provider.connTimer.C
-			provider.connTimer.Reset(time.Duration(provider.RefreshConn))
-		}()
+		// Call a separate function because the defer statement has function scope
+		provider.sidecarWatcher()
 	}
+}
+
+func (provider *Sidecar) sidecarWatcher() {
+	// Use refresh interval to occasionally reconnect to Sidecar in case the stream connection is lost
+	req, err := http.NewRequest(http.MethodGet, provider.Endpoint+"/watch", nil)
+	if err != nil {
+		log.Errorf("Error creating http request to Sidecar instance '%s': %s", provider.Endpoint, err)
+		time.Sleep(5 * time.Second)
+		return
+	}
+
+	cx, cancel := context.WithCancel(context.Background())
+	// Cancel the infinite timeout request automatically after we reset connTimer
+	defer cancel()
+
+	req = req.WithContext(cx)
+
+	resp, err := watcherHTTPClient.Do(req)
+	if err != nil {
+		log.Errorf("Error connecting to Sidecar instance '%s': %s", provider.Endpoint, err)
+		time.Sleep(5 * time.Second)
+		return
+	}
+	defer resp.Body.Close()
+
+	safe.Go(func() { catalog.DecodeStream(resp.Body, provider.callbackLoader) })
+
+	// Wait on refresh connection timer. If this expires we haven't seen an update in a
+	// while and should cancel the request, reset the time, and reconnect just in case
+	<-provider.connTimer.C
+	provider.connTimer.Reset(time.Duration(provider.RefreshConn))
 }
 
 func (provider *Sidecar) callbackLoader(sidecarStates map[string][]*service.Service, err error) {
