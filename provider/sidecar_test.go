@@ -101,6 +101,7 @@ func TestSidecarMakeBackends(t *testing.T) {
 	Convey("Verify creating backends", t, func() {
 		prov := Sidecar{
 			Endpoint: "http://some.dummy.service",
+			MaxConns: 10,
 		}
 
 		dummyState.AddServiceEntry(
@@ -121,6 +122,12 @@ func TestSidecarMakeBackends(t *testing.T) {
 		So(backs["web"].LoadBalancer.Method, ShouldEqual, "wrr")
 		So(backs["web"].Servers["some-aws-host"].URL, ShouldEqual, "http://some-aws-host:8000")
 		So(backs["api"].Servers["another-aws-host"], ShouldBeZeroValue)
+
+		So(backs["web"].MaxConn.Amount, ShouldEqual, 10)
+		So(backs["web"].MaxConn.ExtractorFunc, ShouldEqual, "request.host")
+		So(backs["api"].MaxConn.Amount, ShouldEqual, 10)
+		So(backs["api"].MaxConn.ExtractorFunc, ShouldEqual, "request.host")
+
 	})
 }
 

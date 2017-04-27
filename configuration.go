@@ -336,6 +336,7 @@ func NewTraefikDefaultPointersConfiguration() *TraefikConfiguration {
 	defaultSidecar.Endpoint = "http://127.0.0.1:7777"
 	defaultSidecar.Frontend = "sidecar.toml"
 	defaultSidecar.RefreshConn = flaeg.Duration(60 * time.Second)
+	defaultSidecar.MaxConns = 300
 
 	//default Docker
 	var defaultDocker provider.Docker

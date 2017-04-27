@@ -21,9 +21,10 @@ import (
 )
 
 const (
-	method = "wrr"
-	weight = 0
-	sticky = false
+	method               = "wrr"
+	weight               = 0
+	sticky               = false
+	maxConnExtractorFunc = "request.host"
 )
 
 var (
@@ -49,6 +50,7 @@ type Sidecar struct {
 	configurationChan chan<- types.ConfigMessage
 	RefreshConn       flaeg.Duration `description:"How often to refresh the connection to Sidecar backend"`
 	connTimer         *time.Timer
+	MaxConns          int64 `description:"Maximum number of connections allowed for each backend"`
 }
 
 type callback func(map[string][]*service.Service, error)
@@ -201,8 +203,14 @@ func (provider *Sidecar) makeBackends(sidecarStates map[string][]*service.Servic
 	sidecarBacks := make(map[string]*types.Backend)
 	for serviceName, services := range sidecarStates {
 		newServers := make(map[string]types.Server)
-		newBackend := &types.Backend{LoadBalancer: &types.LoadBalancer{Method: method, Sticky: sticky},
-			Servers: newServers}
+		newBackend := &types.Backend{
+			LoadBalancer: &types.LoadBalancer{Method: method, Sticky: sticky},
+			Servers:      newServers,
+			MaxConn: &types.MaxConn{
+				Amount:        provider.MaxConns,
+				ExtractorFunc: maxConnExtractorFunc,
+			},
+		}
 		for _, serv := range services {
 			if serv.IsAlive() {
 				for i := 0; i < len(serv.Ports); i++ {
