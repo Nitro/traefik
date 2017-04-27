@@ -215,6 +215,8 @@ func (provider *Sidecar) fetchState() (*catalog.ServicesState, error) {
 		return nil, err
 	}
 
+	defer resp.Body.Close()
+
 	bytes, err := ioutil.ReadAll(resp.Body)
 	if err != nil {
 		return nil, err
