@@ -5,7 +5,6 @@ import (
 	"net/http"
 	"reflect"
 	"testing"
-	"time"
 
 	"github.com/Nitro/sidecar/catalog"
 	"github.com/Nitro/sidecar/service"
@@ -15,48 +14,80 @@ import (
 	. "github.com/smartystreets/goconvey/convey"
 )
 
-func TestSidecarFetchState(t *testing.T) {
-	Convey("Verify Fetching State handler", t, func() {
-		var baseTime = time.Now().UTC().Round(time.Second)
-		var testPort = service.Port{Type: "tcp", Port: 8000, ServicePort: 8000}
+var (
+	origSidecarHTTPClient = sidecarHTTPClient
+	origWatcherHTTPClient = watcherHTTPClient
+	dummyState            *catalog.ServicesState
+)
 
-		httpmock.Activate()
-		defer httpmock.DeactivateAndReset()
+func setup() {
+	sidecarHTTPClient = http.DefaultClient
+	watcherHTTPClient = http.DefaultClient
 
-		httpmock.RegisterResponder("GET", "http://some.dummy.service/state.json",
-			func(req *http.Request) (*http.Response, error) {
-
-				service := service.Service{ID: "007", Name: "api", Hostname: "some-aws-host",
-					Updated: baseTime, Status: 1, Ports: []service.Port{testPort}}
-				returnState := catalog.NewServicesState()
-				returnState.AddServiceEntry(service)
-				resp, err := httpmock.NewJsonResponse(200, returnState)
-				if err != nil {
-					return httpmock.NewStringResponse(500, ""), nil
-				}
-				return resp, nil
+	dummyState = catalog.NewServicesState()
+	dummyState.AddServiceEntry(
+		service.Service{
+			ID:       "007",
+			Name:     "web",
+			Hostname: "some-aws-host",
+			Status:   0,
+			Ports: []service.Port{
+				service.Port{
+					Type:        "tcp",
+					Port:        8000,
+					ServicePort: 8000,
+				},
 			},
-		)
+		},
+	)
 
+	httpmock.Activate()
+
+	httpmock.RegisterResponder(http.MethodGet, "http://some.dummy.service",
+		func(req *http.Request) (*http.Response, error) {
+			return httpmock.NewStringResponse(200, ""), nil
+		},
+	)
+
+	httpmock.RegisterResponder(http.MethodGet, "http://some.dummy.service/state.json",
+		func(req *http.Request) (*http.Response, error) {
+			resp, err := httpmock.NewJsonResponse(200, dummyState)
+			if err != nil {
+				return httpmock.NewStringResponse(500, ""), nil
+			}
+			return resp, nil
+		},
+	)
+}
+
+func teardown() {
+	httpmock.DeactivateAndReset()
+
+	sidecarHTTPClient = origSidecarHTTPClient
+	watcherHTTPClient = origWatcherHTTPClient
+}
+
+func TestSidecarFetchState(t *testing.T) {
+	setup()
+	defer teardown()
+
+	Convey("Verify fetching state", t, func() {
 		prov := Sidecar{
 			Endpoint: "http://some.dummy.service",
 		}
 
-		testState, err := prov.fetchState()
-		testServices := testState.ByService()
-
-		compareState := catalog.NewServicesState()
-		service := &service.Service{ID: "007", Name: "api", Hostname: "some-aws-host",
-			Updated: baseTime, Status: 1, Ports: []service.Port{testPort}}
-		compareState.AddServiceEntry(*service)
-		compareServices := compareState.ByService()
-
+		receivedState, err := prov.fetchState()
 		So(err, ShouldBeNil)
-		So(reflect.DeepEqual(testServices["api"][0].Ports, compareServices["api"][0].Ports), ShouldBeTrue)
-		So(testServices["api"][0].Hostname, ShouldEqual, compareServices["api"][0].Hostname)
 
-		compareServices["api"][0].Hostname = "wrong-host"
-		So(testServices["api"][0].Hostname, ShouldNotEqual, compareServices["api"][0].Hostname)
+		receivedServices := receivedState.ByService()
+
+		expectedServices := dummyState.ByService()
+
+		So(reflect.DeepEqual(receivedServices["web"][0].Ports, expectedServices["web"][0].Ports), ShouldBeTrue)
+		So(receivedServices["web"][0].Hostname, ShouldEqual, expectedServices["web"][0].Hostname)
+
+		expectedServices["web"][0].Hostname = "wrong-host"
+		So(receivedServices["web"][0].Hostname, ShouldNotEqual, expectedServices["web"][0].Hostname)
 
 		prov.Endpoint = "http://yetanother.dummy.service"
 		_, err = prov.fetchState()
@@ -64,71 +95,51 @@ func TestSidecarFetchState(t *testing.T) {
 	})
 }
 
-func TestSidecarFetchBackend(t *testing.T) {
-	Convey("Verify Fetching Backend", t, func() {
-		httpmock.Activate()
-		defer httpmock.DeactivateAndReset()
-
+func TestSidecarMakeBackends(t *testing.T) {
+	setup()
+	defer teardown()
+	Convey("Verify creating backends", t, func() {
 		prov := Sidecar{
 			Endpoint: "http://some.dummy.service",
 		}
 
-		httpmock.RegisterResponder("GET", "http://some.dummy.service/state.json",
-			func(req *http.Request) (*http.Response, error) {
-
-				testPort := service.Port{Type: "tcp", Port: 8000, ServicePort: 8000}
-				returnState := catalog.NewServicesState()
-				baseTime := time.Now().UTC().Round(time.Second)
-				serviceA := service.Service{ID: "007", Name: "web", Hostname: "some-aws-host",
-					Updated: baseTime.Add(5 * time.Second), Status: 0, Ports: []service.Port{testPort}}
-				serviceB := service.Service{ID: "008", Name: "api", Hostname: "another-aws-host",
-					Updated: baseTime, Status: 1}
-				returnState.AddServiceEntry(serviceA)
-				returnState.AddServiceEntry(serviceB)
-				resp, err := httpmock.NewJsonResponse(200, returnState)
-				if err != nil {
-					return httpmock.NewStringResponse(500, ""), nil
-				}
-				return resp, nil
+		dummyState.AddServiceEntry(
+			service.Service{
+				ID:       "008",
+				Name:     "api",
+				Hostname: "another-aws-host",
+				Status:   1,
 			},
 		)
+
 		states, err := prov.fetchState()
+		So(err, ShouldBeNil)
+
 		sidecarStates := states.ByService()
 		backs := prov.makeBackends(sidecarStates)
 
-		So(err, ShouldBeNil)
 		So(backs["web"].LoadBalancer.Method, ShouldEqual, "wrr")
 		So(backs["web"].Servers["some-aws-host"].URL, ShouldEqual, "http://some-aws-host:8000")
 		So(backs["api"].Servers["another-aws-host"], ShouldBeZeroValue)
 	})
 }
 
-func TestSidecarMakeFrontEnd(t *testing.T) {
-	Convey("Verify Sidecar Frontend Config Loader", t, func() {
-		httpmock.Activate()
-		defer httpmock.DeactivateAndReset()
-
-		httpmock.RegisterResponder("GET", "http://some.dummy.service",
-			func(req *http.Request) (*http.Response, error) {
-
-				returnState := catalog.NewServicesState()
-				resp, err := httpmock.NewJsonResponse(200, returnState)
-				if err != nil {
-					return httpmock.NewStringResponse(500, ""), nil
-				}
-				return resp, nil
-			},
-		)
+func TestSidecarMakeFrontend(t *testing.T) {
+	Convey("Verify Sidecar Frontend config loading", t, func() {
 		prov := Sidecar{
+			BaseProvider: BaseProvider{
+				Watch: false,
+			},
 			Endpoint: "http://some.dummy.service",
+			Frontend: "testdata/sidecar_testdata.toml",
 		}
-		prov.Watch = true
-		prov.Frontend = "testdata/sidecar_testdata.toml"
+
 		conf, err := prov.makeFrontend()
 		So(err, ShouldEqual, nil)
 		So(conf["web"].PassHostHeader, ShouldEqual, true)
 		So(conf["web"].EntryPoints, ShouldResemble, []string{"http", "https"})
 		So(conf["web"].Routes["test_1"].Rule, ShouldEqual, "Host: some-aws-host")
+
 		prov.Frontend = "testdata/dummyfile.toml"
 		_, err = prov.makeFrontend()
 		So(err, ShouldNotBeNil)
@@ -136,59 +147,41 @@ func TestSidecarMakeFrontEnd(t *testing.T) {
 }
 
 func TestSidecarProvider(t *testing.T) {
+	setup()
+	defer teardown()
+
 	Convey("Verify Sidecar Provider", t, func() {
-		httpmock.Activate()
-		defer httpmock.DeactivateAndReset()
-
-		httpmock.RegisterResponder("GET", "http://some.dummy.service/state.json",
-			func(req *http.Request) (*http.Response, error) {
-
-				testPort := service.Port{Type: "tcp", Port: 8000, ServicePort: 8000}
-				returnState := catalog.NewServicesState()
-				baseTime := time.Now().UTC().Round(time.Second)
-				serv := service.Service{ID: "007", Name: "web", Hostname: "some-aws-host",
-					Updated: baseTime.Add(5 * time.Second), Status: 0, Ports: []service.Port{testPort}}
-				returnState.AddServiceEntry(serv)
-				resp, err := httpmock.NewJsonResponse(200, returnState)
-				if err != nil {
-					return httpmock.NewStringResponse(500, ""), nil
-				}
-				return resp, nil
-			},
-		)
 		prov := Sidecar{
+			BaseProvider: BaseProvider{
+				Watch: false,
+			},
 			Endpoint: "http://some.dummy.service",
+			Frontend: "testdata/sidecar_testdata.toml",
 		}
-		prov.Watch = false
-		prov.Frontend = "testdata/sidecar_testdata.toml"
 
 		configurationChan := make(chan types.ConfigMessage, 1)
-		constraints := types.Constraints{}
-		pool := safe.NewPool(context.Background())
-		err := prov.Provide(configurationChan, pool, constraints)
+		err := prov.Provide(configurationChan, nil, nil)
 		configMsg, _ := <-configurationChan
+
 		So(err, ShouldBeNil)
 		So(configMsg.ProviderName, ShouldEqual, "sidecar")
 		So(configMsg.Configuration.Frontends["web"].Routes["test_1"].Rule, ShouldEqual, "Host: some-aws-host")
-		So(configMsg.Configuration.Backends["web"].Servers["some-aws-host"].URL, ShouldEndWith, "http://some-aws-host:8000")
+		So(configMsg.Configuration.Backends["web"].Servers["some-aws-host"].URL, ShouldEqual, "http://some-aws-host:8000")
 	})
 }
 
 func TestSidecarWatcher(t *testing.T) {
-	Convey("Verify Sidecar Provider", t, func() {
-		httpmock.Activate()
-		defer httpmock.DeactivateAndReset()
+	setup()
+	defer teardown()
 
-		httpmock.RegisterResponder("GET", "http://some.dummy.service/state.json",
+	Convey("Verify Sidecar Watcher", t, func(c C) {
+		// Return the watcher mock HTTP response on demand
+		releaseWatch := make(chan bool)
+		httpmock.RegisterResponder(http.MethodGet, "http://some.dummy.service/watch",
 			func(req *http.Request) (*http.Response, error) {
+				<-releaseWatch
 
-				testPort := service.Port{Type: "tcp", Port: 9000, ServicePort: 9000}
-				returnState := catalog.NewServicesState()
-				baseTime := time.Now().UTC().Round(time.Second)
-				serv := service.Service{ID: "007", Name: "web", Hostname: "some-aws-host",
-					Updated: baseTime.Add(5 * time.Second), Status: 0, Ports: []service.Port{testPort}}
-				returnState.AddServiceEntry(serv)
-				resp, err := httpmock.NewJsonResponse(200, returnState)
+				resp, err := httpmock.NewJsonResponse(200, dummyState.ByService())
 				if err != nil {
 					return httpmock.NewStringResponse(500, ""), nil
 				}
@@ -196,34 +189,59 @@ func TestSidecarWatcher(t *testing.T) {
 			},
 		)
 
-		httpmock.RegisterResponder("GET", "http://some.dummy.service/watch",
-			func(req *http.Request) (*http.Response, error) {
-
-				testPort := service.Port{Type: "tcp", Port: 9000, ServicePort: 9000}
-				returnState := catalog.NewServicesState()
-				baseTime := time.Now().UTC().Round(time.Second)
-				serv := service.Service{ID: "007", Name: "web", Hostname: "some-aws-host",
-					Updated: baseTime.Add(5 * time.Second), Status: 0, Ports: []service.Port{testPort}}
-				returnState.AddServiceEntry(serv)
-				resp, err := httpmock.NewJsonResponse(200, returnState.ByService())
-				if err != nil {
-					return httpmock.NewStringResponse(500, ""), nil
-				}
-				return resp, nil
-			},
-		)
 		prov := Sidecar{
+			BaseProvider: BaseProvider{
+				Watch: true,
+			},
 			Endpoint: "http://some.dummy.service",
+			Frontend: "testdata/sidecar_testdata.toml",
 		}
-		prov.Watch = true
-		prov.Frontend = "testdata/sidecar_testdata.toml"
-		configurationChan := make(chan types.ConfigMessage, 100)
-		constraints := types.Constraints{}
-		pool := safe.NewPool(context.Background())
-		go prov.Provide(configurationChan, pool, constraints)
-		configMsg, _ := <-configurationChan
+
+		// We have no way to shut down the provider when it's running in watch mode,
+		// so just let the unit test close it at the end
+		configMsgChan := make(chan types.ConfigMessage)
+		go func() {
+			err := prov.Provide(
+				configMsgChan,
+				safe.NewPool(context.Background()),
+				nil,
+			)
+
+			c.So(err, ShouldBeNil)
+		}()
+
+		// Catch the loadSidecarConfig from the end of Provide()
+		configMsg := <-configMsgChan
+
+		// Unblock the first call to recycleConn()
+		releaseWatch <- true
+		configMsg = <-configMsgChan
+
 		So(configMsg.ProviderName, ShouldEqual, "sidecar")
 		So(configMsg.Configuration.Frontends["web"].Routes["test_1"].Rule, ShouldEqual, "Host: some-aws-host")
-		So(configMsg.Configuration.Backends["web"].Servers["some-aws-host"].URL, ShouldEndWith, "http://some-aws-host:9000")
+		So(configMsg.Configuration.Backends["web"].Servers["some-aws-host"].URL, ShouldEqual, "http://some-aws-host:8000")
+
+		dummyState.AddServiceEntry(
+			service.Service{
+				ID:       "009",
+				Name:     "api",
+				Hostname: "another-aws-host",
+				Status:   0,
+				Ports: []service.Port{
+					service.Port{
+						Type:        "tcp",
+						Port:        9000,
+						ServicePort: 9000,
+					},
+				},
+			},
+		)
+
+		// Unblock the second call to recycleConn() to receive the updated config
+		releaseWatch <- true
+		configMsg = <-configMsgChan
+
+		So(configMsg.Configuration.Backends, ShouldContainKey, "api")
+		So(configMsg.Configuration.Backends["api"].Servers["another-aws-host"].URL, ShouldEqual, "http://another-aws-host:9000")
 	})
 }

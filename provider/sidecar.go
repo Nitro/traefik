@@ -10,8 +10,6 @@ import (
 	"strings"
 	"time"
 
-	fsnotify "gopkg.in/fsnotify.v1"
-
 	"github.com/BurntSushi/toml"
 	"github.com/Nitro/sidecar/catalog"
 	"github.com/Nitro/sidecar/service"
@@ -19,12 +17,26 @@ import (
 	"github.com/containous/traefik/log"
 	"github.com/containous/traefik/safe"
 	"github.com/containous/traefik/types"
+	fsnotify "gopkg.in/fsnotify.v1"
 )
 
 const (
 	method = "wrr"
 	weight = 0
 	sticky = false
+)
+
+var (
+	// Disable all timeouts for watcher requests
+	watcherHTTPTransport = &http.Transport{ResponseHeaderTimeout: 0}
+	watcherHTTPClient    = &http.Client{
+		Timeout:   0,
+		Transport: watcherHTTPTransport,
+	}
+
+	sidecarHTTPClient = &http.Client{
+		Timeout: 5 * time.Second,
+	}
 )
 
 var _ Provider = (*Sidecar)(nil)
@@ -123,18 +135,16 @@ func (provider *Sidecar) loadSidecarConfig(sidecarStates map[string][]*service.S
 }
 
 func (provider *Sidecar) sidecarWatcher() error {
-	//set timeout to be just a bot more than connection refresh interval
+	//set timeout to be just a bit more than connection refresh interval
 	provider.connTimer = time.NewTimer(time.Duration(provider.RefreshConn))
-	tr := &http.Transport{ResponseHeaderTimeout: 0}
-	client := &http.Client{
-		Timeout:   0,
-		Transport: tr}
+
 	log.Debugf("Using %s Sidecar connection refresh interval", provider.RefreshConn)
-	provider.recycleConn(client, tr)
+	provider.recycleConn()
+
 	return nil
 }
 
-func (provider *Sidecar) recycleConn(client *http.Client, tr *http.Transport) {
+func (provider *Sidecar) recycleConn() {
 	var err error
 	var resp *http.Response
 	var req *http.Request
@@ -144,19 +154,22 @@ func (provider *Sidecar) recycleConn(client *http.Client, tr *http.Transport) {
 			log.Errorf("Error creating http request to Sidecar: %s, Error: %s", provider.Endpoint, err)
 			continue
 		}
-		resp, err = client.Do(req)
+		resp, err = watcherHTTPClient.Do(req)
 		if err != nil {
 			log.Errorf("Error connecting to Sidecar: %s, Error: %s", provider.Endpoint, err)
 			time.Sleep(5 * time.Second)
 			continue
 		}
+
 		safe.Go(func() { catalog.DecodeStream(resp.Body, provider.callbackLoader) })
 
 		//wait on refresh connection timer.  If this expires we haven't seen an update in a
 		//while and should cancel the request, reset the time, and reconnect just in case
 		<-provider.connTimer.C
 		provider.connTimer.Reset(time.Duration(provider.RefreshConn))
-		tr.CancelRequest(req)
+
+		//TODO: Deprecated method. Refactor this to use a context.
+		watcherHTTPTransport.CancelRequest(req)
 	}
 }
 
@@ -209,8 +222,7 @@ func (provider *Sidecar) makeBackends(sidecarStates map[string][]*service.Servic
 }
 
 func (provider *Sidecar) fetchState() (*catalog.ServicesState, error) {
-	client := &http.Client{Timeout: 5 * time.Second}
-	resp, err := client.Get(provider.Endpoint + "/state.json")
+	resp, err := sidecarHTTPClient.Get(provider.Endpoint + "/state.json")
 	if err != nil {
 		return nil, err
 	}
