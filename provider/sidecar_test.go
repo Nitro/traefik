@@ -15,7 +15,7 @@ import (
 	. "github.com/smartystreets/goconvey/convey"
 )
 
-func Test_FetchState(t *testing.T) {
+func TestSidecarFetchState(t *testing.T) {
 	Convey("Verify Fetching State handler", t, func() {
 		var baseTime = time.Now().UTC().Round(time.Second)
 		var testPort = service.Port{Type: "tcp", Port: 8000, ServicePort: 8000}
@@ -64,7 +64,7 @@ func Test_FetchState(t *testing.T) {
 	})
 }
 
-func Test_FetchBackend(t *testing.T) {
+func TestSidecarFetchBackend(t *testing.T) {
 	Convey("Verify Fetching Backend", t, func() {
 		httpmock.Activate()
 		defer httpmock.DeactivateAndReset()
@@ -103,7 +103,7 @@ func Test_FetchBackend(t *testing.T) {
 	})
 }
 
-func Test_MakeFrontEnd(t *testing.T) {
+func TestSidecarMakeFrontEnd(t *testing.T) {
 	Convey("Verify Sidecar Frontend Config Loader", t, func() {
 		httpmock.Activate()
 		defer httpmock.DeactivateAndReset()
@@ -135,7 +135,7 @@ func Test_MakeFrontEnd(t *testing.T) {
 	})
 }
 
-func Test_SidecarProvider(t *testing.T) {
+func TestSidecarProvider(t *testing.T) {
 	Convey("Verify Sidecar Provider", t, func() {
 		httpmock.Activate()
 		defer httpmock.DeactivateAndReset()
@@ -174,7 +174,7 @@ func Test_SidecarProvider(t *testing.T) {
 	})
 }
 
-func Test_SidecarWatcher(t *testing.T) {
+func TestSidecarWatcher(t *testing.T) {
 	Convey("Verify Sidecar Provider", t, func() {
 		httpmock.Activate()
 		defer httpmock.DeactivateAndReset()
