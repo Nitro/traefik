@@ -106,11 +106,8 @@ func (provider *Sidecar) Provide(configurationChan chan<- types.ConfigMessage, p
 	if err != nil {
 		log.Fatalln("Error reloading Sidecar config", err)
 	}
-	err = provider.loadSidecarConfig(states.ByService())
-	if err != nil {
-		return err
-	}
-	return nil
+
+	return provider.loadSidecarConfig(states.ByService())
 }
 
 func (provider *Sidecar) constructConfig(sidecarStates map[string][]*service.Service) (*types.Configuration, error) {

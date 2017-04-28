@@ -168,7 +168,7 @@ func TestSidecarProvider(t *testing.T) {
 
 		configurationChan := make(chan types.ConfigMessage, 1)
 		err := prov.Provide(configurationChan, nil, nil)
-		configMsg, _ := <-configurationChan
+		configMsg := <-configurationChan
 
 		So(err, ShouldBeNil)
 		So(configMsg.ProviderName, ShouldEqual, "sidecar")
