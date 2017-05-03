@@ -1,6 +1,8 @@
 package provider
 
 import (
+	"encoding/json"
+	"io"
 	"io/ioutil"
 	"net"
 	"net/http"
@@ -89,7 +91,10 @@ func (provider *Sidecar) Provide(configurationChan chan<- types.ConfigMessage, p
 						if errState != nil {
 							log.Errorln("Error reloading Sidecar config", errState)
 						}
-						provider.loadSidecarConfig(states.ByService())
+						errLoadConfig := provider.loadSidecarConfig(states)
+						if errLoadConfig != nil {
+							log.Errorf("Error loading Sidecar config: %s", errLoadConfig)
+						}
 					}
 				case errWatcher := <-watcher.Errors:
 					log.Errorln("Watcher event error", errWatcher)
@@ -107,25 +112,26 @@ func (provider *Sidecar) Provide(configurationChan chan<- types.ConfigMessage, p
 		log.Fatalln("Error reloading Sidecar config", err)
 	}
 
-	return provider.loadSidecarConfig(states.ByService())
+	return provider.loadSidecarConfig(states)
 }
 
-func (provider *Sidecar) constructConfig(sidecarStates map[string][]*service.Service) (*types.Configuration, error) {
+func (provider *Sidecar) constructConfig(sidecarStates *catalog.ServicesState) (*types.Configuration, error) {
 	log.Infoln("loading sidecar config")
 	sidecarConfig := types.Configuration{Backends: provider.makeBackends(sidecarStates)}
 	var err error
-	sidecarConfig.Frontends, err = provider.makeFrontend()
+	sidecarConfig.Frontends, err = provider.makeFrontends()
 	if err != nil {
 		return nil, err
 	}
 	return &sidecarConfig, nil
 }
 
-func (provider *Sidecar) loadSidecarConfig(sidecarStates map[string][]*service.Service) error {
+func (provider *Sidecar) loadSidecarConfig(sidecarStates *catalog.ServicesState) error {
 	conf, err := provider.constructConfig(sidecarStates)
 	if err != nil {
 		return err
 	}
+
 	provider.configurationChan <- types.ConfigMessage{
 		ProviderName:  "sidecar",
 		Configuration: conf,
@@ -148,7 +154,7 @@ func (provider *Sidecar) recycleConn() {
 	var resp *http.Response
 	var req *http.Request
 	for { //use refresh interval to occasionally reconnect to Sidecar in case the stream connection is lost
-		req, err = http.NewRequest("GET", provider.Endpoint+"/watch", nil)
+		req, err = http.NewRequest("GET", provider.Endpoint+"/watch?by_service=false", nil)
 		if err != nil {
 			log.Errorf("Error creating http request to Sidecar: %s, Error: %s", provider.Endpoint, err)
 			continue
@@ -160,7 +166,7 @@ func (provider *Sidecar) recycleConn() {
 			continue
 		}
 
-		safe.Go(func() { catalog.DecodeStream(resp.Body, provider.callbackLoader) })
+		safe.Go(func() { decodeStream(resp.Body, provider.callbackLoader) })
 
 		//wait on refresh connection timer.  If this expires we haven't seen an update in a
 		//while and should cancel the request, reset the time, and reconnect just in case
@@ -172,22 +178,26 @@ func (provider *Sidecar) recycleConn() {
 	}
 }
 
-func (provider *Sidecar) callbackLoader(sidecarStates map[string][]*service.Service, err error) {
+func (provider *Sidecar) callbackLoader(sidecarStates *catalog.ServicesState, err error) {
 	//load config regardless
-	provider.loadSidecarConfig(sidecarStates)
+	errLoadConfig := provider.loadSidecarConfig(sidecarStates)
+	if errLoadConfig != nil {
+		log.Error("Error reloading config: %s", errLoadConfig)
+	}
 
 	if err != nil {
 		return
 	}
+
 	//else reset connection timer
 	if !provider.connTimer.Stop() {
 		<-provider.connTimer.C
 	}
+
 	provider.connTimer.Reset(time.Duration(provider.RefreshConn))
-	return
 }
 
-func (provider *Sidecar) makeFrontend() (map[string]*types.Frontend, error) {
+func (provider *Sidecar) makeFrontends() (map[string]*types.Frontend, error) {
 	configuration := new(types.Configuration)
 	if _, err := toml.DecodeFile(provider.Frontend, configuration); err != nil {
 		log.Errorf("Error reading file: %s", err)
@@ -196,33 +206,44 @@ func (provider *Sidecar) makeFrontend() (map[string]*types.Frontend, error) {
 	return configuration.Frontends, nil
 }
 
-func (provider *Sidecar) makeBackends(sidecarStates map[string][]*service.Service) map[string]*types.Backend {
+func (provider *Sidecar) makeBackends(sidecarStates *catalog.ServicesState) map[string]*types.Backend {
 	sidecarBacks := make(map[string]*types.Backend)
-	for serviceName, services := range sidecarStates {
-		newServers := make(map[string]types.Server)
-		newBackend := &types.Backend{
-			LoadBalancer: &types.LoadBalancer{Method: method, Sticky: sticky},
-			Servers:      newServers,
-			MaxConn: &types.MaxConn{
-				Amount:        provider.MaxConns,
-				ExtractorFunc: maxConnExtractorFunc,
-			},
-		}
-		for _, serv := range services {
-			if serv.IsAlive() {
-				for i := 0; i < len(serv.Ports); i++ {
-					ipAddr, err := net.LookupIP(serv.Hostname)
+
+	sidecarStates.EachService(
+		func(hostname *string, serviceId *string, svc *service.Service) {
+			var backend *types.Backend
+			var ok bool
+			if backend, ok = sidecarBacks[svc.Name]; !ok {
+				backend = &types.Backend{
+					LoadBalancer: &types.LoadBalancer{Method: method, Sticky: sticky},
+					Servers:      make(map[string]types.Server),
+					MaxConn: &types.MaxConn{
+						Amount:        provider.MaxConns,
+						ExtractorFunc: maxConnExtractorFunc,
+					},
+				}
+
+				sidecarBacks[svc.Name] = backend
+			}
+
+			if svc.IsAlive() {
+				for i := 0; i < len(svc.Ports); i++ {
+					ipAddr, err := net.LookupIP(svc.Hostname)
 					if err != nil {
 						log.Errorln("Error resolving Ip address, ", err)
-						newBackend.Servers[serv.Hostname] = types.Server{URL: "http://" + serv.Hostname + ":" + strconv.FormatInt(serv.Ports[i].Port, 10)}
+						backend.Servers[svc.Hostname] = types.Server{
+							URL: "http://" + svc.Hostname + ":" + strconv.FormatInt(svc.Ports[i].Port, 10),
+						}
 					} else {
-						newBackend.Servers[serv.Hostname] = types.Server{URL: "http://" + ipAddr[0].String() + ":" + strconv.FormatInt(serv.Ports[i].Port, 10)}
+						backend.Servers[svc.Hostname] = types.Server{
+							URL: "http://" + ipAddr[0].String() + ":" + strconv.FormatInt(svc.Ports[i].Port, 10),
+						}
 					}
 				}
 			}
-		}
-		sidecarBacks[serviceName] = newBackend
-	}
+		},
+	)
+
 	return sidecarBacks
 }
 
@@ -244,4 +265,20 @@ func (provider *Sidecar) fetchState() (*catalog.ServicesState, error) {
 		return nil, err
 	}
 	return state, nil
+}
+
+func decodeStream(input io.Reader, callback func(*catalog.ServicesState, error)) error {
+	dec := json.NewDecoder(input)
+	for dec.More() {
+		var conf catalog.ServicesState
+		err := dec.Decode(&conf)
+
+		callback(&conf, err)
+
+		if err != nil {
+			log.Errorf("Error decoding stream: %s", err)
+			return err
+		}
+	}
+	return nil
 }

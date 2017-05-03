@@ -116,8 +116,7 @@ func TestSidecarMakeBackends(t *testing.T) {
 		states, err := prov.fetchState()
 		So(err, ShouldBeNil)
 
-		sidecarStates := states.ByService()
-		backs := prov.makeBackends(sidecarStates)
+		backs := prov.makeBackends(states)
 
 		So(backs["web"].LoadBalancer.Method, ShouldEqual, "wrr")
 		So(backs["web"].Servers["some-aws-host"].URL, ShouldEqual, "http://some-aws-host:8000")
@@ -188,7 +187,7 @@ func TestSidecarWatcher(t *testing.T) {
 			func(req *http.Request) (*http.Response, error) {
 				<-releaseWatch
 
-				resp, err := httpmock.NewJsonResponse(200, dummyState.ByService())
+				resp, err := httpmock.NewJsonResponse(200, dummyState)
 				if err != nil {
 					return httpmock.NewStringResponse(500, ""), nil
 				}
