@@ -1,0 +1,19 @@
+[frontends]
+    [frontends.web]
+    backend = "web"
+    passHostHeader = true
+    entrypoints = ["http","https"]
+        [frontends.web.routes.test_1]
+        rule = "Host: some-aws-host"
+
+    [frontends.test_service]
+    backend = "test_service"
+    entrypoints = ["http","https"]
+        [frontends.test_service.routes.test_1]
+        rule = "Host: some-aws-host"
+
+[backends]
+    [backends.web]
+        [backends.web.maxconn]
+            amount = 10
+            extractorfunc = "request.host"
