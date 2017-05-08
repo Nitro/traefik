@@ -6,7 +6,6 @@ import (
 	"net/http"
 	"os"
 
-	"github.com/prometheus/common/log"
 	"github.com/vulcand/oxy/utils"
 )
 
@@ -22,7 +21,6 @@ func NewErrorPagesHandler(errorPage string) utils.ErrorHandler {
 }
 
 func (ep *ErrorPages) ServeHTTP(w http.ResponseWriter, req *http.Request, err error) {
-	log.Errorln(err)
 	statusCode := http.StatusInternalServerError
 	if e, ok := err.(net.Error); ok {
 		if e.Timeout() {
