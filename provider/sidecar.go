@@ -48,7 +48,6 @@ var _ Provider = (*Sidecar)(nil)
 type Sidecar struct {
 	BaseProvider      `mapstructure:",squash"`
 	Endpoint          string `description:"Sidecar URL"`
-	Frontend          string `description:"Configuration file for frontend"`
 	configurationChan chan<- types.ConfigMessage
 	RefreshConn       flaeg.Duration `description:"How often to refresh the connection to Sidecar backend"`
 	connTimer         *time.Timer
@@ -75,7 +74,7 @@ func (provider *Sidecar) Provide(configurationChan chan<- types.ConfigMessage, p
 			return err
 		}
 
-		file, err := os.Open(provider.Frontend)
+		file, err := os.Open(provider.Filename)
 		if err != nil {
 			log.Errorln("Error opening file", err)
 			return err
@@ -210,7 +209,7 @@ func (provider *Sidecar) callbackLoader(sidecarStates *catalog.ServicesState, er
 
 func (provider *Sidecar) makeFrontends() (map[string]*types.Frontend, error) {
 	configuration := new(types.Configuration)
-	if _, err := toml.DecodeFile(provider.Frontend, configuration); err != nil {
+	if _, err := toml.DecodeFile(provider.Filename, configuration); err != nil {
 		log.Errorf("Error reading file: %s", err)
 		return nil, err
 	}

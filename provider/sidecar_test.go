@@ -116,10 +116,10 @@ func TestSidecar(t *testing.T) {
 		Convey("run Provide", func() {
 			prov := Sidecar{
 				BaseProvider: BaseProvider{
-					Watch: false,
+					Watch:    false,
+					Filename: "testdata/sidecar_testdata.toml",
 				},
 				Endpoint: "http://some.dummy.service",
-				Frontend: "testdata/sidecar_testdata.toml",
 			}
 
 			configurationChan := make(chan types.ConfigMessage, 1)
@@ -149,10 +149,10 @@ func TestSidecar(t *testing.T) {
 
 			prov := Sidecar{
 				BaseProvider: BaseProvider{
-					Watch: true,
+					Watch:    true,
+					Filename: "testdata/sidecar_testdata.toml",
 				},
 				Endpoint:    "http://some.dummy.service",
-				Frontend:    "testdata/sidecar_testdata.toml",
 				RefreshConn: flaeg.Duration(100 * time.Millisecond),
 			}
 
@@ -218,10 +218,10 @@ func TestSidecarMakeFrontend(t *testing.T) {
 	Convey("Verify Sidecar Frontend config loading", t, func() {
 		prov := Sidecar{
 			BaseProvider: BaseProvider{
-				Watch: false,
+				Watch:    false,
+				Filename: "testdata/sidecar_testdata.toml",
 			},
 			Endpoint: "http://some.dummy.service",
-			Frontend: "testdata/sidecar_testdata.toml",
 		}
 
 		conf, err := prov.makeFrontends()
@@ -230,7 +230,7 @@ func TestSidecarMakeFrontend(t *testing.T) {
 		So(conf["web"].EntryPoints, ShouldResemble, []string{"http", "https"})
 		So(conf["web"].Routes["test_1"].Rule, ShouldEqual, "Host: some-aws-host")
 
-		prov.Frontend = "testdata/dummyfile.toml"
+		prov.Filename = "testdata/dummyfile.toml"
 		_, err = prov.makeFrontends()
 		So(err, ShouldNotBeNil)
 	})
