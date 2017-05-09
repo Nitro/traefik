@@ -23,10 +23,11 @@ import (
 )
 
 const (
-	method               = "wrr"
-	weight               = 0
-	sticky               = false
-	maxConnExtractorFunc = "request.host"
+	method                      = "wrr"
+	weight                      = 0
+	sticky                      = false
+	defaultMaxConnAmount        = 2000
+	defaultMaxConnExtractorFunc = "request.host"
 )
 
 var (
@@ -51,7 +52,15 @@ type Sidecar struct {
 	configurationChan chan<- types.ConfigMessage
 	RefreshConn       flaeg.Duration `description:"How often to refresh the connection to Sidecar backend"`
 	connTimer         *time.Timer
-	MaxConns          int64 `description:"Maximum number of connections allowed for each backend"`
+}
+
+type sidecarFrontend struct {
+	*types.Frontend
+	MaxConn *types.MaxConn `json:"maxConn,omitempty"`
+}
+
+type sidecarConfig struct {
+	Frontends map[string]*sidecarFrontend `json:"frontends,omitempty"`
 }
 
 type callback func(map[string][]*service.Service, error)
@@ -119,12 +128,32 @@ func (provider *Sidecar) Provide(configurationChan chan<- types.ConfigMessage, p
 
 func (provider *Sidecar) constructConfig(sidecarStates *catalog.ServicesState) (*types.Configuration, error) {
 	log.Infoln("loading sidecar config")
-	sidecarConfig := types.Configuration{Backends: provider.makeBackends(sidecarStates)}
-	var err error
-	sidecarConfig.Frontends, err = provider.makeFrontends()
+	sidecarConfig := types.Configuration{
+		Backends:  provider.makeBackends(sidecarStates),
+		Frontends: map[string]*types.Frontend{},
+	}
+
+	frontends, err := provider.makeFrontends()
 	if err != nil {
 		return nil, err
 	}
+
+	for name, frontend := range frontends {
+		sidecarConfig.Frontends[name] = frontend.Frontend
+
+		if backend, ok := sidecarConfig.Backends[name]; ok {
+			backend.MaxConn = frontend.MaxConn
+
+			if backend.MaxConn == nil {
+				backend.MaxConn = &types.MaxConn{
+					Amount:        defaultMaxConnAmount,
+					ExtractorFunc: defaultMaxConnExtractorFunc,
+				}
+			}
+
+		}
+	}
+
 	return &sidecarConfig, nil
 }
 
@@ -203,12 +232,13 @@ func (provider *Sidecar) callbackLoader(sidecarStates *catalog.ServicesState, er
 	provider.connTimer.Reset(time.Duration(provider.RefreshConn))
 }
 
-func (provider *Sidecar) makeFrontends() (map[string]*types.Frontend, error) {
-	configuration := new(types.Configuration)
+func (provider *Sidecar) makeFrontends() (map[string]*sidecarFrontend, error) {
+	configuration := new(sidecarConfig)
 	if _, err := toml.DecodeFile(provider.Filename, configuration); err != nil {
 		log.Errorf("Error reading file: %s", err)
 		return nil, err
 	}
+
 	return configuration.Frontends, nil
 }
 
@@ -223,10 +253,6 @@ func (provider *Sidecar) makeBackends(sidecarStates *catalog.ServicesState) map[
 				backend = &types.Backend{
 					LoadBalancer: &types.LoadBalancer{Method: method, Sticky: sticky},
 					Servers:      make(map[string]types.Server),
-					MaxConn: &types.MaxConn{
-						Amount:        provider.MaxConns,
-						ExtractorFunc: maxConnExtractorFunc,
-					},
 				}
 
 				sidecarBacks[svc.Name] = backend

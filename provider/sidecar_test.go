@@ -85,7 +85,6 @@ func TestSidecar(t *testing.T) {
 		Convey("create backends", func() {
 			prov := Sidecar{
 				Endpoint: "http://some.dummy.service",
-				MaxConns: 10,
 			}
 
 			dummyState.AddServiceEntry(
@@ -106,11 +105,56 @@ func TestSidecar(t *testing.T) {
 			So(backs["web"].Servers["some-aws-host"].URL, ShouldEqual, "http://some-aws-host:8000")
 			So(backs["api"].Servers["another-aws-host"], ShouldBeZeroValue)
 
-			So(backs["web"].MaxConn.Amount, ShouldEqual, 10)
-			So(backs["web"].MaxConn.ExtractorFunc, ShouldEqual, "request.host")
-			So(backs["api"].MaxConn.Amount, ShouldEqual, 10)
-			So(backs["api"].MaxConn.ExtractorFunc, ShouldEqual, "request.host")
+			So(backs["web"].MaxConn, ShouldBeNil)
+			So(backs["api"].MaxConn, ShouldBeNil)
 
+		})
+
+		Convey("construct config", func() {
+			prov := Sidecar{
+				BaseProvider: BaseProvider{
+					Filename: "testdata/sidecar_testdata.toml",
+				},
+				Endpoint: "http://some.dummy.service",
+			}
+
+			dummyState.AddServiceEntry(
+				service.Service{
+					ID:       "008",
+					Name:     "api",
+					Hostname: "another-aws-host",
+					Status:   1,
+				},
+			)
+
+			dummyState.AddServiceEntry(
+				service.Service{
+					ID:       "009",
+					Name:     "sso",
+					Hostname: "yet-another-aws-host",
+					Status:   1,
+				},
+			)
+
+			states, err := prov.fetchState()
+			So(err, ShouldBeNil)
+
+			config, err := prov.constructConfig(states)
+			So(err, ShouldBeNil)
+
+			So(config.Frontends, ShouldContainKey, "web")
+			So(config.Frontends, ShouldContainKey, "api")
+			So(config.Frontends, ShouldNotContainKey, "sso")
+
+			So(config.Backends, ShouldContainKey, "web")
+			So(config.Backends, ShouldContainKey, "api")
+			So(config.Backends, ShouldContainKey, "sso")
+
+			So(config.Backends["web"].MaxConn.Amount, ShouldEqual, 10)
+			So(config.Backends["web"].MaxConn.ExtractorFunc, ShouldEqual, "client.ip")
+			So(config.Backends["api"].MaxConn.Amount, ShouldEqual, defaultMaxConnAmount)
+			So(config.Backends["api"].MaxConn.ExtractorFunc, ShouldEqual, defaultMaxConnExtractorFunc)
+			So(config.Backends["sso"].MaxConn, ShouldBeNil)
 		})
 
 		Convey("run Provide", func() {
@@ -196,8 +240,8 @@ func TestSidecar(t *testing.T) {
 				},
 			)
 
-			// Unblock the second call to recycleConn() to receive the updated config
-			releaseWatch <- true
+			// Unblock the rest of the calls to recycleConn() to receive the updated config
+			close(releaseWatch)
 			configMsg = <-configMsgChan
 
 			So(configMsg.Configuration.Backends, ShouldContainKey, "api")
@@ -224,11 +268,13 @@ func TestSidecarMakeFrontend(t *testing.T) {
 			Endpoint: "http://some.dummy.service",
 		}
 
-		conf, err := prov.makeFrontends()
+		frontends, err := prov.makeFrontends()
 		So(err, ShouldEqual, nil)
-		So(conf["web"].PassHostHeader, ShouldEqual, true)
-		So(conf["web"].EntryPoints, ShouldResemble, []string{"http", "https"})
-		So(conf["web"].Routes["test_1"].Rule, ShouldEqual, "Host: some-aws-host")
+		So(frontends, ShouldContainKey, "web")
+		So(frontends, ShouldContainKey, "api")
+		So(frontends["web"].PassHostHeader, ShouldEqual, true)
+		So(frontends["web"].EntryPoints, ShouldResemble, []string{"http", "https"})
+		So(frontends["web"].Routes["test_1"].Rule, ShouldEqual, "Host: some-aws-host")
 
 		prov.Filename = "testdata/dummyfile.toml"
 		_, err = prov.makeFrontends()
