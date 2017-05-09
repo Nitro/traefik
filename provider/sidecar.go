@@ -171,11 +171,7 @@ func (provider *Sidecar) recycleConn(stop chan bool, pool *safe.Pool) {
 				continue
 			}
 
-			pool.Go(
-				func(stop chan bool) {
-					decodeStream(resp.Body, provider.callbackLoader, stop)
-				},
-			)
+			safe.Go(func() { decodeStream(resp.Body, provider.callbackLoader) })
 
 			//wait on refresh connection timer.  If this expires we haven't seen an update in a
 			//while and should cancel the request, reset the time, and reconnect just in case
@@ -277,22 +273,17 @@ func (provider *Sidecar) fetchState() (*catalog.ServicesState, error) {
 	return state, nil
 }
 
-func decodeStream(input io.Reader, callback func(*catalog.ServicesState, error), stop chan bool) error {
+func decodeStream(input io.Reader, callback func(*catalog.ServicesState, error)) error {
 	dec := json.NewDecoder(input)
 	for dec.More() {
-		select {
-		case <-stop:
-			return nil
-		default:
-			var conf catalog.ServicesState
-			err := dec.Decode(&conf)
+		var conf catalog.ServicesState
+		err := dec.Decode(&conf)
 
-			callback(&conf, err)
+		callback(&conf, err)
 
-			if err != nil {
-				log.Errorf("Error decoding stream: %s", err)
-				return err
-			}
+		if err != nil {
+			log.Errorf("Error decoding stream: %s", err)
+			return err
 		}
 	}
 	return nil
