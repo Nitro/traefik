@@ -5,9 +5,11 @@ import (
 	"net/http"
 	"reflect"
 	"testing"
+	"time"
 
 	"github.com/Nitro/sidecar/catalog"
 	"github.com/Nitro/sidecar/service"
+	"github.com/containous/flaeg"
 	"github.com/containous/traefik/safe"
 	"github.com/containous/traefik/types"
 	"github.com/jarcoal/httpmock"
@@ -149,17 +151,18 @@ func TestSidecar(t *testing.T) {
 				BaseProvider: BaseProvider{
 					Watch: true,
 				},
-				Endpoint: "http://some.dummy.service",
-				Frontend: "testdata/sidecar_testdata.toml",
+				Endpoint:    "http://some.dummy.service",
+				Frontend:    "testdata/sidecar_testdata.toml",
+				RefreshConn: flaeg.Duration(100 * time.Millisecond),
 			}
 
-			// We have no way to shut down the provider when it's running in watch mode,
-			// so just let the unit test close it at the end
 			configMsgChan := make(chan types.ConfigMessage)
+			pool := safe.NewPool(context.Background())
+			defer pool.Cleanup()
 			go func() {
 				err := prov.Provide(
 					configMsgChan,
-					safe.NewPool(context.Background()),
+					pool,
 					nil,
 				)
 
@@ -199,6 +202,7 @@ func TestSidecar(t *testing.T) {
 
 			So(configMsg.Configuration.Backends, ShouldContainKey, "api")
 			So(configMsg.Configuration.Backends["api"].Servers["another-aws-host"].URL, ShouldEqual, "http://another-aws-host:9000")
+
 		})
 
 		Reset(func() {

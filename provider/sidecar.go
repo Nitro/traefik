@@ -61,10 +61,13 @@ type callback func(map[string][]*service.Service, error)
 // using the given configuration channel.
 func (provider *Sidecar) Provide(configurationChan chan<- types.ConfigMessage, pool *safe.Pool, constraints types.Constraints) error {
 	provider.configurationChan = configurationChan
+
 	if provider.Watch {
-		safe.Go(func() {
-			provider.sidecarWatcher()
-		})
+		pool.Go(
+			func(stop chan bool) {
+				provider.sidecarWatcher(stop, pool)
+			},
+		)
 
 		watcher, err := fsnotify.NewWatcher()
 		if err != nil {
@@ -139,42 +142,50 @@ func (provider *Sidecar) loadSidecarConfig(sidecarStates *catalog.ServicesState)
 	return nil
 }
 
-func (provider *Sidecar) sidecarWatcher() error {
+func (provider *Sidecar) sidecarWatcher(stop chan bool, pool *safe.Pool) {
 	//set timeout to be just a bit more than connection refresh interval
 	provider.connTimer = time.NewTimer(time.Duration(provider.RefreshConn))
 
 	log.Debugf("Using %s Sidecar connection refresh interval", provider.RefreshConn)
-	provider.recycleConn()
-
-	return nil
+	provider.recycleConn(stop, pool)
 }
 
-func (provider *Sidecar) recycleConn() {
+func (provider *Sidecar) recycleConn(stop chan bool, pool *safe.Pool) {
 	var err error
 	var resp *http.Response
 	var req *http.Request
-	for { //use refresh interval to occasionally reconnect to Sidecar in case the stream connection is lost
-		req, err = http.NewRequest("GET", provider.Endpoint+"/watch?by_service=false", nil)
-		if err != nil {
-			log.Errorf("Error creating http request to Sidecar: %s, Error: %s", provider.Endpoint, err)
-			continue
+	for {
+		select {
+		case <-stop:
+			return
+		default:
+			//use refresh interval to occasionally reconnect to Sidecar in case the stream connection is lost
+			req, err = http.NewRequest("GET", provider.Endpoint+"/watch?by_service=false", nil)
+			if err != nil {
+				log.Errorf("Error creating http request to Sidecar: %s, Error: %s", provider.Endpoint, err)
+				continue
+			}
+			resp, err = watcherHTTPClient.Do(req)
+			if err != nil {
+				log.Errorf("Error connecting to Sidecar: %s, Error: %s", provider.Endpoint, err)
+				time.Sleep(5 * time.Second)
+				continue
+			}
+
+			pool.Go(
+				func(stop chan bool) {
+					decodeStream(resp.Body, provider.callbackLoader, stop)
+				},
+			)
+
+			//wait on refresh connection timer.  If this expires we haven't seen an update in a
+			//while and should cancel the request, reset the time, and reconnect just in case
+			<-provider.connTimer.C
+			provider.connTimer.Reset(time.Duration(provider.RefreshConn))
+
+			//TODO: Deprecated method. Refactor this to use a context.
+			watcherHTTPTransport.CancelRequest(req)
 		}
-		resp, err = watcherHTTPClient.Do(req)
-		if err != nil {
-			log.Errorf("Error connecting to Sidecar: %s, Error: %s", provider.Endpoint, err)
-			time.Sleep(5 * time.Second)
-			continue
-		}
-
-		safe.Go(func() { decodeStream(resp.Body, provider.callbackLoader) })
-
-		//wait on refresh connection timer.  If this expires we haven't seen an update in a
-		//while and should cancel the request, reset the time, and reconnect just in case
-		<-provider.connTimer.C
-		provider.connTimer.Reset(time.Duration(provider.RefreshConn))
-
-		//TODO: Deprecated method. Refactor this to use a context.
-		watcherHTTPTransport.CancelRequest(req)
 	}
 }
 
@@ -267,17 +278,22 @@ func (provider *Sidecar) fetchState() (*catalog.ServicesState, error) {
 	return state, nil
 }
 
-func decodeStream(input io.Reader, callback func(*catalog.ServicesState, error)) error {
+func decodeStream(input io.Reader, callback func(*catalog.ServicesState, error), stop chan bool) error {
 	dec := json.NewDecoder(input)
 	for dec.More() {
-		var conf catalog.ServicesState
-		err := dec.Decode(&conf)
+		select {
+		case <-stop:
+			return nil
+		default:
+			var conf catalog.ServicesState
+			err := dec.Decode(&conf)
 
-		callback(&conf, err)
+			callback(&conf, err)
 
-		if err != nil {
-			log.Errorf("Error decoding stream: %s", err)
-			return err
+			if err != nil {
+				log.Errorf("Error decoding stream: %s", err)
+				return err
+			}
 		}
 	}
 	return nil
