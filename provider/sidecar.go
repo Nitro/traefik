@@ -1,6 +1,7 @@
 package provider
 
 import (
+	"context"
 	"encoding/json"
 	"fmt"
 	"io"
@@ -186,36 +187,42 @@ func (provider *Sidecar) sidecarWatcher(stop chan bool, pool *safe.Pool) {
 }
 
 func (provider *Sidecar) recycleConn(stop chan bool, pool *safe.Pool) {
-	var err error
-	var resp *http.Response
-	var req *http.Request
 	for {
 		select {
 		case <-stop:
 			return
 		default:
-			//use refresh interval to occasionally reconnect to Sidecar in case the stream connection is lost
-			req, err = http.NewRequest("GET", provider.Endpoint+"/watch?by_service=false", nil)
-			if err != nil {
-				log.Errorf("Error creating http request to Sidecar: %s, Error: %s", provider.Endpoint, err)
-				continue
-			}
-			resp, err = watcherHTTPClient.Do(req)
-			if err != nil {
-				log.Errorf("Error connecting to Sidecar: %s, Error: %s", provider.Endpoint, err)
-				time.Sleep(5 * time.Second)
-				continue
-			}
+			// Wrap logic in an anonymous function because the defer statement has function scope
+			func() {
+				// Use refresh interval to occasionally reconnect to Sidecar in case the stream connection is lost
+				req, err := http.NewRequest("GET", provider.Endpoint+"/watch?by_service=false", nil)
+				if err != nil {
+					log.Errorf("Error creating watch request for Sidecar instance '%s': %s", provider.Endpoint, err)
+					time.Sleep(5 * time.Second)
+					return
+				}
 
-			safe.Go(func() { decodeStream(resp.Body, provider.callbackLoader) })
+				ctx, cancel := context.WithCancel(context.Background())
+				// Cancel the infinite timeout request automatically after we reset connTimer
+				defer cancel()
 
-			//wait on refresh connection timer.  If this expires we haven't seen an update in a
-			//while and should cancel the request, reset the time, and reconnect just in case
-			<-provider.connTimer.C
-			provider.connTimer.Reset(time.Duration(provider.RefreshConn))
+				req = req.WithContext(ctx)
 
-			//TODO: Deprecated method. Refactor this to use a context.
-			watcherHTTPTransport.CancelRequest(req)
+				resp, err := watcherHTTPClient.Do(req)
+				if err != nil {
+					log.Errorf("Error connecting to Sidecar instance '%s': %s", provider.Endpoint, err)
+					time.Sleep(5 * time.Second)
+					return
+				}
+				defer resp.Body.Close()
+
+				safe.Go(func() { decodeStream(resp.Body, provider.callbackLoader) })
+
+				// Wait on refresh connection timer. If this expires we haven't seen an update in a
+				// while and should cancel the request, reset the time, and reconnect just in case
+				<-provider.connTimer.C
+				provider.connTimer.Reset(time.Duration(provider.RefreshConn))
+			}()
 		}
 	}
 }
