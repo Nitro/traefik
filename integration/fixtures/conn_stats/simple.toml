@@ -1,0 +1,25 @@
+defaultEntryPoints = ["http"]
+
+logLevel = "DEBUG"
+
+[entryPoints]
+  [entryPoints.http]
+  address = ":8000"
+
+[web]
+  address = ":8080"
+
+[file]
+[frontends]
+    [frontends.whoami]
+      backend = "whoami"
+      [frontends.whoami.routes.route]
+        rule = "Path:/whoami"
+
+[backends]
+  [backends.whoami]
+    [backends.whoami.maxconn]
+      amount = 2
+      extractorfunc = "request.host"
+    [backends.whoami.servers.server]
+    url = "http://{{.Server}}:80"
