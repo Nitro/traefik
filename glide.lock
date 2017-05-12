@@ -1,5 +1,5 @@
-hash: 36b390c0e0b297694059c6138281cc84d24cff125217652d29a91188386083ae
-updated: 2017-05-03T17:36:00.521286119+01:00
+hash: 7231d855791fc6caf825edab9ccd70f8e3091e99bf726e72cf9a19809e6ec9fc
+updated: 2017-05-12T15:20:04.364848984+01:00
 imports:
 - name: cloud.google.com/go
   version: 2e6a95edb1071d750f6d7db777bf66cd2997af6c
@@ -357,7 +357,7 @@ imports:
 - name: github.com/Nitro/memberlist
   version: 490eb18c36b5181b667a4cf41d05eabacd855aad
 - name: github.com/Nitro/sidecar
-  version: 2f5d357f0dce6d8f30acb1c5c281ba5a7075d4f7
+  version: 56cb7f1a269721cf7d9bbb0f4cc490913e0e7a7b
   subpackages:
   - catalog
   - output
@@ -383,6 +383,12 @@ imports:
   version: d8ed2627bdf02c080bf22230dbb337003b7aba2d
   subpackages:
   - difflib
+- name: github.com/pquerna/ffjson
+  version: f60b597ded7e7542b36fe20999dfd48166abd5ae
+  subpackages:
+  - ffjson
+  - fflib/v1
+  - fflib/v1/internal
 - name: github.com/prometheus/client_golang
   version: 08fd2e12372a66e68e30523c7642e0cbc3e4fbde
   subpackages:
