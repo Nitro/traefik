@@ -1,5 +1,5 @@
-hash: 10d4f5988aabcae824802eaba4ec35512453559752a0333969b94c2e69a0d7e5
-updated: 2017-04-13T16:14:00.147796817+01:00
+hash: 36b390c0e0b297694059c6138281cc84d24cff125217652d29a91188386083ae
+updated: 2017-05-03T17:36:00.521286119+01:00
 imports:
 - name: cloud.google.com/go
   version: 2e6a95edb1071d750f6d7db777bf66cd2997af6c
@@ -54,7 +54,7 @@ imports:
   - service/route53
   - service/sts
 - name: github.com/Azure/azure-sdk-for-go
-  version: 088007b3b08cc02b27f2eadfdcd870958460ce7e
+  version: 8dd1f3ff407c300cff0a4bfedd969111ca5a7903
   subpackages:
   - arm/dns
 - name: github.com/Azure/go-autorest
@@ -85,7 +85,7 @@ imports:
 - name: github.com/codegangsta/cli
   version: bf4a526f48af7badd25d2cb02d587e1b01be3b50
 - name: github.com/codegangsta/negroni
-  version: c0db5feaa33826cd5117930c8f4ee5c0f565eec6
+  version: 0c3570ad2938a95d5d584eb76304b7f70642e4aa
 - name: github.com/containous/flaeg
   version: b5d2dc5878df07c2d74413348186982e7b865871
 - name: github.com/containous/mux
@@ -249,11 +249,11 @@ imports:
 - name: github.com/golang/glog
   version: fca8c8854093a154ff1eb580aae10276ad6b1b5f
 - name: github.com/golang/protobuf
-  version: 2bba0603135d7d7f5cb73b2125beeda19c09f4ef
+  version: 18c9bb3261723cd5401db4d0c9fbc5c3b6c70fe8
   subpackages:
   - proto
 - name: github.com/google/go-github
-  version: de33c46a823d3f723514fc5333b75ef2e937b7df
+  version: e8d46665e050742f457a58088b1e6b794b2ae966
   subpackages:
   - github
 - name: github.com/google/go-querystring
@@ -269,7 +269,7 @@ imports:
 - name: github.com/gorilla/websocket
   version: a91eba7f97777409bc2c443f5534d41dd20c5720
 - name: github.com/hashicorp/consul
-  version: a44c50eaf11944605cc2cfcca9e5de22edfe4ac9
+  version: 10acfb76826d5378c2c6df349cd236c965492a30
   subpackages:
   - api
 - name: github.com/hashicorp/errwrap
@@ -282,18 +282,18 @@ imports:
   - codec
 - name: github.com/hashicorp/go-multierror
   version: d30f09973e19c1dfcd120b2d9c4f168e68d6b5d5
+- name: github.com/hashicorp/go-rootcerts
+  version: 6bb64b370b90e7ef1fa532be9e591a81c3493e00
 - name: github.com/hashicorp/go-version
   version: 03c5bf6be031b6dd45afec16b1cf94fc8938bc77
 - name: github.com/hashicorp/serf
-  version: 3d6a974239f0b515c87479d5beefe575ad866805
+  version: 65c2babe73c7a096cd24e9eeec67613eb4e436c9
   subpackages:
   - coordinate
 - name: github.com/JamesClonk/vultr
-  version: 0f156dd232bc4ebf8a32ba83fec57c0e4c9db69f
+  version: 7047a71e8edb5ccaa98e20cefe37a118dd7bfcb0
   subpackages:
   - lib
-- name: github.com/jarcoal/httpmock
-  version: 4442edb3db31196622da56482fd8d0fa375fba4d
 - name: github.com/jmespath/go-jmespath
   version: bd40a432e4c76585ef6b72d3fd96fb9b6dc7b68d
 - name: github.com/jonboulle/clockwork
@@ -345,11 +345,13 @@ imports:
   - records/state
   - util
 - name: github.com/Microsoft/go-winio
-  version: fff283ad5116362ca252298cfc9b95828956d85d
+  version: f3b1913901892ada21d52d0cffe1d4c7080d36b7
 - name: github.com/miekg/dns
   version: 8060d9f51305bbe024b99679454e62f552cd0b0b
+- name: github.com/mitchellh/go-homedir
+  version: b8bc1bf767474819792c23f32d8286a45736f1c6
 - name: github.com/mitchellh/mapstructure
-  version: 53818660ed4955e899c0bcafa97299a388bd7c8e
+  version: cc8532a8e9a55ea36402aa21efdf403a60d34096
 - name: github.com/mvdan/xurls
   version: db96455566f05ffe42bd6ac671f05eeb1152b45d
 - name: github.com/Nitro/memberlist
@@ -592,13 +594,15 @@ imports:
   version: 3887ee99ecf07df5b447e9b00d9c0b2adaa9f3e4
 - name: gopkg.in/ini.v1
   version: e7fea39b01aea8d5671f6858f0532f56e8bff3a5
+- name: gopkg.in/jarcoal/httpmock.v1
+  version: cf52904a3cf0f78f199ecade6a6df8e245d5b25a
 - name: gopkg.in/mgo.v2
   version: 3f83fa5005286a7fe593b055f0d7771a7dce4655
   subpackages:
   - bson
   - internal/json
 - name: gopkg.in/ns1/ns1-go.v2
-  version: 2abc76c60bf88ba33b15d1d87a13f624d8dff956
+  version: c563826f4cbef9c11bebeb9f20a3f7afe9c1e2f4
   subpackages:
   - rest
   - rest/model/account
