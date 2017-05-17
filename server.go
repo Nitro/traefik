@@ -53,6 +53,7 @@ type Server struct {
 	loggerMiddleware           *middlewares.Logger
 	routinesPool               *safe.Pool
 	leadership                 *cluster.Leadership
+	backendConnLimits          map[string]*connlimit.ConnLimiter
 }
 
 type serverEntryPoints map[string]*serverEntryPoint
@@ -88,6 +89,7 @@ func NewServer(globalConfiguration GlobalConfiguration) *Server {
 		// leadership creation if cluster mode
 		server.leadership = cluster.NewLeadership(server.routinesPool.Ctx(), globalConfiguration.Cluster)
 	}
+	server.backendConnLimits = make(map[string]*connlimit.ConnLimiter)
 
 	return server
 }
@@ -732,12 +734,15 @@ func (server *Server) loadConfig(configurations configs, globalConfiguration Glo
 								continue frontend
 							}
 							log.Debugf("Creating load-balancer connlimit")
-							lb, err = connlimit.New(lb, extractFunc, maxConns.Amount, connlimit.Logger(oxyLogger))
+							cl, err := connlimit.New(lb, extractFunc, maxConns.Amount, connlimit.Logger(oxyLogger))
 							if err != nil {
 								log.Errorf("Error creating connlimit: %v", err)
 								log.Errorf("Skipping frontend %s...", frontendName)
 								continue frontend
 							}
+
+							lb = cl
+							server.backendConnLimits[frontend.Backend] = cl
 						}
 						// retry ?
 						if globalConfiguration.Retry != nil {
