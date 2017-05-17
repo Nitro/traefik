@@ -11,3 +11,13 @@
     [frontends.api]
         backend = "api"
         passHostHeader = true
+    [frontends.maxconn_amount_only]
+        backend = "maxconn_amount_only"
+        passHostHeader = true
+        [frontends.maxconn_amount_only.maxconn]
+            amount = 42
+    [frontends.maxconn_extractorfunc_only]
+        backend = "maxconn_extractorfunc_only"
+        passHostHeader = true
+        [frontends.maxconn_extractorfunc_only.maxconn]
+            extractorfunc = "client.ip"

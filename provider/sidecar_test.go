@@ -121,15 +121,6 @@ func TestSidecar(t *testing.T) {
 			dummyState.AddServiceEntry(
 				service.Service{
 					ID:       "008",
-					Name:     "api",
-					Hostname: "another-aws-host",
-					Status:   1,
-				},
-			)
-
-			dummyState.AddServiceEntry(
-				service.Service{
-					ID:       "009",
 					Name:     "sso",
 					Hostname: "yet-another-aws-host",
 					Status:   1,
@@ -143,18 +134,66 @@ func TestSidecar(t *testing.T) {
 			So(err, ShouldBeNil)
 
 			So(config.Frontends, ShouldContainKey, "web")
-			So(config.Frontends, ShouldContainKey, "api")
 			So(config.Frontends, ShouldNotContainKey, "sso")
 
 			So(config.Backends, ShouldContainKey, "web")
-			So(config.Backends, ShouldContainKey, "api")
 			So(config.Backends, ShouldContainKey, "sso")
 
-			So(config.Backends["web"].MaxConn.Amount, ShouldEqual, 10)
-			So(config.Backends["web"].MaxConn.ExtractorFunc, ShouldEqual, "client.ip")
-			So(config.Backends["api"].MaxConn.Amount, ShouldEqual, defaultMaxConnAmount)
-			So(config.Backends["api"].MaxConn.ExtractorFunc, ShouldEqual, defaultMaxConnExtractorFunc)
-			So(config.Backends["sso"].MaxConn, ShouldBeNil)
+			Convey("and set maxconn values", func() {
+				So(config.Backends["web"].MaxConn.Amount, ShouldEqual, 10)
+				So(config.Backends["web"].MaxConn.ExtractorFunc, ShouldEqual, "client.ip")
+				So(config.Backends["sso"].MaxConn, ShouldBeNil)
+			})
+
+			Convey("and set default maxconn values", func() {
+				dummyState.AddServiceEntry(
+					service.Service{
+						ID:       "009",
+						Name:     "api",
+						Hostname: "aws-host",
+						Status:   0,
+					},
+				)
+
+				dummyState.AddServiceEntry(
+					service.Service{
+						ID:       "010",
+						Name:     "maxconn_amount_only",
+						Hostname: "aws-host",
+						Status:   0,
+					},
+				)
+
+				dummyState.AddServiceEntry(
+					service.Service{
+						ID:       "011",
+						Name:     "maxconn_extractorfunc_only",
+						Hostname: "aws-host",
+						Status:   0,
+					},
+				)
+
+				states, err := prov.fetchState()
+				So(err, ShouldBeNil)
+				config, err := prov.constructConfig(states)
+				So(err, ShouldBeNil)
+
+				So(config.Frontends, ShouldContainKey, "api")
+				So(config.Frontends, ShouldContainKey, "maxconn_amount_only")
+				So(config.Frontends, ShouldContainKey, "maxconn_extractorfunc_only")
+				So(config.Backends, ShouldContainKey, "api")
+				So(config.Backends, ShouldContainKey, "maxconn_amount_only")
+				So(config.Backends, ShouldContainKey, "maxconn_extractorfunc_only")
+
+				So(config.Backends["api"].MaxConn.Amount, ShouldEqual, defaultMaxConnAmount)
+				So(config.Backends["api"].MaxConn.ExtractorFunc, ShouldEqual, defaultMaxConnExtractorFunc)
+
+				So(config.Backends["maxconn_amount_only"].MaxConn.Amount, ShouldEqual, 42)
+				So(config.Backends["maxconn_amount_only"].MaxConn.ExtractorFunc, ShouldEqual, defaultMaxConnExtractorFunc)
+
+				So(config.Backends["maxconn_extractorfunc_only"].MaxConn.Amount, ShouldEqual, defaultMaxConnAmount)
+				So(config.Backends["maxconn_extractorfunc_only"].MaxConn.ExtractorFunc, ShouldEqual, "client.ip")
+			})
 		})
 
 		Convey("run Provide", func() {
