@@ -143,11 +143,18 @@ func (provider *Sidecar) constructConfig(sidecarStates *catalog.ServicesState) (
 
 		if backend, ok := sidecarConfig.Backends[name]; ok {
 			backend.MaxConn = frontend.MaxConn
-
 			if backend.MaxConn == nil {
 				backend.MaxConn = &types.MaxConn{
 					Amount:        defaultMaxConnAmount,
 					ExtractorFunc: defaultMaxConnExtractorFunc,
+				}
+			} else {
+				if backend.MaxConn.Amount == 0 {
+					backend.MaxConn.Amount = defaultMaxConnAmount
+				}
+
+				if backend.MaxConn.ExtractorFunc == "" {
+					backend.MaxConn.ExtractorFunc = defaultMaxConnExtractorFunc
 				}
 			}
 
