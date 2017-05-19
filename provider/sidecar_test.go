@@ -36,6 +36,7 @@ func TestSidecar(t *testing.T) {
 						Type:        "tcp",
 						Port:        8000,
 						ServicePort: 8000,
+						IP:          "127.0.0.1",
 					},
 				},
 			},
@@ -92,7 +93,38 @@ func TestSidecar(t *testing.T) {
 					ID:       "008",
 					Name:     "api",
 					Hostname: "another-aws-host",
+					Status:   0,
+					Ports: []service.Port{
+						service.Port{
+							Type:        "tcp",
+							Port:        8000,
+							ServicePort: 8000,
+							IP:          "127.0.0.1",
+						},
+						service.Port{
+							Type:        "udp",
+							Port:        9000,
+							ServicePort: 9000,
+							IP:          "127.0.0.1",
+						},
+					},
+				},
+			)
+
+			dummyState.AddServiceEntry(
+				service.Service{
+					ID:       "009",
+					Name:     "sso",
+					Hostname: "yet-another-aws-host",
 					Status:   1,
+					Ports: []service.Port{
+						service.Port{
+							Type:        "tcp",
+							Port:        8000,
+							ServicePort: 8000,
+							IP:          "127.0.0.1",
+						},
+					},
 				},
 			)
 
@@ -101,13 +133,19 @@ func TestSidecar(t *testing.T) {
 
 			backs := prov.makeBackends(states)
 
+			So(backs, ShouldContainKey, "web")
+			So(backs, ShouldContainKey, "api")
+			So(backs, ShouldContainKey, "sso")
+
 			So(backs["web"].LoadBalancer.Method, ShouldEqual, "wrr")
-			So(backs["web"].Servers["some-aws-host"].URL, ShouldEqual, "http://some-aws-host:8000")
-			So(backs["api"].Servers["another-aws-host"], ShouldBeZeroValue)
+			So(backs["web"].Servers["some-aws-host"].URL, ShouldEqual, "http://127.0.0.1:8000")
 
-			So(backs["web"].MaxConn, ShouldBeNil)
-			So(backs["api"].MaxConn, ShouldBeNil)
+			// A server can have multiple ports exposed
+			So(backs["api"].Servers["another-aws-host_8000"].URL, ShouldEqual, "http://127.0.0.1:8000")
+			So(backs["api"].Servers["another-aws-host_9000"].URL, ShouldEqual, "http://127.0.0.1:9000")
 
+			// Don't add servers for services that are not alive
+			So(backs["sso"].Servers, ShouldBeEmpty)
 		})
 
 		Convey("construct config", func() {
@@ -123,7 +161,7 @@ func TestSidecar(t *testing.T) {
 					ID:       "008",
 					Name:     "sso",
 					Hostname: "yet-another-aws-host",
-					Status:   1,
+					Status:   0,
 				},
 			)
 
@@ -142,6 +180,8 @@ func TestSidecar(t *testing.T) {
 			Convey("and set maxconn values", func() {
 				So(config.Backends["web"].MaxConn.Amount, ShouldEqual, 10)
 				So(config.Backends["web"].MaxConn.ExtractorFunc, ShouldEqual, "client.ip")
+
+				// Don't add any connection limits if a backend is not assigned to any frontend
 				So(config.Backends["sso"].MaxConn, ShouldBeNil)
 			})
 
@@ -212,7 +252,7 @@ func TestSidecar(t *testing.T) {
 			So(err, ShouldBeNil)
 			So(configMsg.ProviderName, ShouldEqual, "sidecar")
 			So(configMsg.Configuration.Frontends["web"].Routes["test_1"].Rule, ShouldEqual, "Host: some-aws-host")
-			So(configMsg.Configuration.Backends["web"].Servers["some-aws-host"].URL, ShouldEqual, "http://some-aws-host:8000")
+			So(configMsg.Configuration.Backends["web"].Servers["some-aws-host"].URL, ShouldEqual, "http://127.0.0.1:8000")
 		})
 
 		Convey("run Provide() in watcher mode", func(c C) {
@@ -261,7 +301,7 @@ func TestSidecar(t *testing.T) {
 
 			So(configMsg.ProviderName, ShouldEqual, "sidecar")
 			So(configMsg.Configuration.Frontends["web"].Routes["test_1"].Rule, ShouldEqual, "Host: some-aws-host")
-			So(configMsg.Configuration.Backends["web"].Servers["some-aws-host"].URL, ShouldEqual, "http://some-aws-host:8000")
+			So(configMsg.Configuration.Backends["web"].Servers["some-aws-host"].URL, ShouldEqual, "http://127.0.0.1:8000")
 
 			dummyState.AddServiceEntry(
 				service.Service{
@@ -274,6 +314,7 @@ func TestSidecar(t *testing.T) {
 							Type:        "tcp",
 							Port:        9000,
 							ServicePort: 9000,
+							IP:          "169.254.1.1",
 						},
 					},
 				},
@@ -284,7 +325,7 @@ func TestSidecar(t *testing.T) {
 			configMsg = <-configMsgChan
 
 			So(configMsg.Configuration.Backends, ShouldContainKey, "api")
-			So(configMsg.Configuration.Backends["api"].Servers["another-aws-host"].URL, ShouldEqual, "http://another-aws-host:9000")
+			So(configMsg.Configuration.Backends["api"].Servers["another-aws-host"].URL, ShouldEqual, "http://169.254.1.1:9000")
 
 		})
 

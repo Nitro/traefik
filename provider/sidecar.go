@@ -2,13 +2,12 @@ package provider
 
 import (
 	"encoding/json"
+	"fmt"
 	"io"
 	"io/ioutil"
-	"net"
 	"net/http"
 	"os"
 	"path/filepath"
-	"strconv"
 	"strings"
 	"time"
 
@@ -266,17 +265,13 @@ func (provider *Sidecar) makeBackends(sidecarStates *catalog.ServicesState) map[
 			}
 
 			if svc.IsAlive() {
-				for i := 0; i < len(svc.Ports); i++ {
-					ipAddr, err := net.LookupIP(svc.Hostname)
-					if err != nil {
-						log.Errorln("Error resolving Ip address, ", err)
-						backend.Servers[svc.Hostname] = types.Server{
-							URL: "http://" + svc.Hostname + ":" + strconv.FormatInt(svc.Ports[i].Port, 10),
-						}
-					} else {
-						backend.Servers[svc.Hostname] = types.Server{
-							URL: "http://" + ipAddr[0].String() + ":" + strconv.FormatInt(svc.Ports[i].Port, 10),
-						}
+				for _, port := range svc.Ports {
+					name := svc.Hostname
+					if len(svc.Ports) > 1 {
+						name = fmt.Sprintf("%s_%d", svc.Hostname, port.Port)
+					}
+					backend.Servers[name] = types.Server{
+						URL: fmt.Sprintf("http://%s:%d", port.IP, port.Port),
 					}
 				}
 			}
