@@ -105,7 +105,6 @@ func TestSidecar(t *testing.T) {
 							Type:        "udp",
 							Port:        9000,
 							ServicePort: 9000,
-							IP:          "127.0.0.1",
 						},
 					},
 				},
@@ -142,7 +141,9 @@ func TestSidecar(t *testing.T) {
 
 			// A server can have multiple ports exposed
 			So(backs["api"].Servers["another-aws-host_8000"].URL, ShouldEqual, "http://127.0.0.1:8000")
-			So(backs["api"].Servers["another-aws-host_9000"].URL, ShouldEqual, "http://127.0.0.1:9000")
+			// Fall back to the hostname if the service.Port does not contain the IP address
+			// and the hostname IP address can't be resolved
+			So(backs["api"].Servers["another-aws-host_9000"].URL, ShouldEqual, "http://another-aws-host:9000")
 
 			// Don't add servers for services that are not alive
 			So(backs["sso"].Servers, ShouldBeEmpty)

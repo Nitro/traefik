@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"io"
 	"io/ioutil"
+	"net"
 	"net/http"
 	"os"
 	"path/filepath"
@@ -270,8 +271,21 @@ func (provider *Sidecar) makeBackends(sidecarStates *catalog.ServicesState) map[
 					if len(svc.Ports) > 1 {
 						name = fmt.Sprintf("%s_%d", svc.Hostname, port.Port)
 					}
+
+					host := port.IP
+					if host == "" {
+						ipAddr, err := net.LookupIP(svc.Hostname)
+						if err != nil {
+							log.Errorf("Error resolving IP address for host '%s': %s", svc.Hostname, err)
+							host = svc.Hostname
+
+						} else {
+							host = ipAddr[0].String()
+						}
+					}
+
 					backend.Servers[name] = types.Server{
-						URL: fmt.Sprintf("http://%s:%d", port.IP, port.Port),
+						URL: fmt.Sprintf("http://%s:%d", host, port.Port),
 					}
 				}
 			}
