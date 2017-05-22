@@ -53,6 +53,9 @@ function ConnStatsController($scope, $interval, $log, $filter, ConnStats) {
       },
       x: function(d) { return d.label; },
       y: function(d) { return d.value; },
+      yAxis: {
+        tickFormat: d3.format('d')
+      },
       valueFormat: d3.format('d'),
       showValues: true,
       rotateLabels: 90
