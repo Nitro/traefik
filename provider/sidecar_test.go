@@ -141,9 +141,9 @@ func TestSidecar(t *testing.T) {
 
 			// A server can have multiple ports exposed
 			So(backs["api"].Servers["another-aws-host_8000"].URL, ShouldEqual, "http://127.0.0.1:8000")
-			// Fall back to the hostname if the service.Port does not contain the IP address
+			// Don't add the server if the service.Port does not contain the IP address
 			// and the hostname IP address can't be resolved
-			So(backs["api"].Servers["another-aws-host_9000"].URL, ShouldEqual, "http://another-aws-host:9000")
+			So(backs["api"].Servers, ShouldNotContainKey, "another-aws-host_9000")
 
 			// Don't add servers for services that are not alive
 			So(backs["sso"].Servers, ShouldBeEmpty)

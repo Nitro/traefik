@@ -277,7 +277,7 @@ func (provider *Sidecar) makeBackends(sidecarStates *catalog.ServicesState) map[
 						ipAddr, err := net.LookupIP(svc.Hostname)
 						if err != nil {
 							log.Errorf("Error resolving IP address for host '%s': %s", svc.Hostname, err)
-							host = svc.Hostname
+							continue
 
 						} else {
 							host = ipAddr[0].String()
