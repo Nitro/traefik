@@ -267,16 +267,19 @@ func (provider *Sidecar) makeBackends(sidecarStates *catalog.ServicesState) map[
 
 			if svc.IsAlive() {
 				for _, port := range svc.Ports {
-					host := port.IP
-					if host == "" {
+					var host string
+					parsedIP := net.ParseIP(port.IP)
+					if parsedIP == nil {
+						// Try to resolve the hostname if we don't get a valid IP from Sidecar
 						ipAddr, err := net.LookupIP(svc.Hostname)
 						if err != nil {
 							log.Errorf("Error resolving IP address for host '%s': %s", svc.Hostname, err)
 							continue
-
 						} else {
 							host = ipAddr[0].String()
 						}
+					} else {
+						host = parsedIP.String()
 					}
 
 					// A service can expose multiple ports on the same host
