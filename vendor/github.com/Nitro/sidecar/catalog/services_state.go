@@ -1,5 +1,7 @@
 package catalog
 
+//go:generate ffjson $GOFILE
+
 import (
 	"encoding/json"
 	"fmt"
@@ -105,7 +107,7 @@ func (server *Server) HasService(id string) bool {
 // Return a Marshaled/Encoded byte array that can be deocoded with
 // catalog.Decode()
 func (state *ServicesState) Encode() []byte {
-	jsonData, err := json.Marshal(state)
+	jsonData, err := state.MarshalJSON()
 	if err != nil {
 		log.Error("ERROR: Failed to Marshal state")
 		return []byte{}
@@ -277,7 +279,6 @@ func (state *ServicesState) AddServiceEntry(entry service.Service) {
 		// by sending them the record. We're saved from an endless
 		// retransmit loop by the Invalidates() call above.
 		state.retransmit(entry)
-		return
 	}
 }
 
@@ -623,7 +624,7 @@ func makeServiceMapping(svcList []service.Service) map[string]*service.Service {
 // Take a byte slice and return a properly reconstituted state struct
 func Decode(data []byte) (*ServicesState, error) {
 	newState := NewServicesState()
-	err := json.Unmarshal(data, &newState)
+	err := newState.UnmarshalJSON(data)
 	if err != nil {
 		log.Errorf("Error decoding state! (%s)", err.Error())
 	}

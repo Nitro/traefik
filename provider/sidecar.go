@@ -2,13 +2,13 @@ package provider
 
 import (
 	"encoding/json"
+	"fmt"
 	"io"
 	"io/ioutil"
 	"net"
 	"net/http"
 	"os"
 	"path/filepath"
-	"strconv"
 	"strings"
 	"time"
 
@@ -266,17 +266,26 @@ func (provider *Sidecar) makeBackends(sidecarStates *catalog.ServicesState) map[
 			}
 
 			if svc.IsAlive() {
-				for i := 0; i < len(svc.Ports); i++ {
-					ipAddr, err := net.LookupIP(svc.Hostname)
-					if err != nil {
-						log.Errorln("Error resolving Ip address, ", err)
-						backend.Servers[svc.Hostname] = types.Server{
-							URL: "http://" + svc.Hostname + ":" + strconv.FormatInt(svc.Ports[i].Port, 10),
+				for _, port := range svc.Ports {
+					var host string
+					parsedIP := net.ParseIP(port.IP)
+					if parsedIP == nil {
+						// Try to resolve the hostname if we don't get a valid IP from Sidecar
+						ipAddr, err := net.LookupIP(svc.Hostname)
+						if err != nil {
+							log.Errorf("Error resolving IP address for host '%s': %s", svc.Hostname, err)
+							continue
+						} else {
+							host = ipAddr[0].String()
 						}
 					} else {
-						backend.Servers[svc.Hostname] = types.Server{
-							URL: "http://" + ipAddr[0].String() + ":" + strconv.FormatInt(svc.Ports[i].Port, 10),
-						}
+						host = parsedIP.String()
+					}
+
+					// A service can expose multiple ports on the same host
+					name := fmt.Sprintf("%s_%d", svc.Hostname, port.Port)
+					backend.Servers[name] = types.Server{
+						URL: fmt.Sprintf("http://%s:%d", host, port.Port),
 					}
 				}
 			}
