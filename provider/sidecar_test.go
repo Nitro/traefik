@@ -137,7 +137,7 @@ func TestSidecar(t *testing.T) {
 			So(backs, ShouldContainKey, "sso")
 
 			So(backs["web"].LoadBalancer.Method, ShouldEqual, "wrr")
-			So(backs["web"].Servers["some-aws-host"].URL, ShouldEqual, "http://127.0.0.1:8000")
+			So(backs["web"].Servers["some-aws-host_8000"].URL, ShouldEqual, "http://127.0.0.1:8000")
 
 			// A server can have multiple ports exposed
 			So(backs["api"].Servers["another-aws-host_8000"].URL, ShouldEqual, "http://127.0.0.1:8000")
@@ -253,7 +253,7 @@ func TestSidecar(t *testing.T) {
 			So(err, ShouldBeNil)
 			So(configMsg.ProviderName, ShouldEqual, "sidecar")
 			So(configMsg.Configuration.Frontends["web"].Routes["test_1"].Rule, ShouldEqual, "Host: some-aws-host")
-			So(configMsg.Configuration.Backends["web"].Servers["some-aws-host"].URL, ShouldEqual, "http://127.0.0.1:8000")
+			So(configMsg.Configuration.Backends["web"].Servers["some-aws-host_8000"].URL, ShouldEqual, "http://127.0.0.1:8000")
 		})
 
 		Convey("run Provide() in watcher mode", func(c C) {
@@ -302,7 +302,7 @@ func TestSidecar(t *testing.T) {
 
 			So(configMsg.ProviderName, ShouldEqual, "sidecar")
 			So(configMsg.Configuration.Frontends["web"].Routes["test_1"].Rule, ShouldEqual, "Host: some-aws-host")
-			So(configMsg.Configuration.Backends["web"].Servers["some-aws-host"].URL, ShouldEqual, "http://127.0.0.1:8000")
+			So(configMsg.Configuration.Backends["web"].Servers["some-aws-host_8000"].URL, ShouldEqual, "http://127.0.0.1:8000")
 
 			dummyState.AddServiceEntry(
 				service.Service{
@@ -326,7 +326,7 @@ func TestSidecar(t *testing.T) {
 			configMsg = <-configMsgChan
 
 			So(configMsg.Configuration.Backends, ShouldContainKey, "api")
-			So(configMsg.Configuration.Backends["api"].Servers["another-aws-host"].URL, ShouldEqual, "http://169.254.1.1:9000")
+			So(configMsg.Configuration.Backends["api"].Servers["another-aws-host_9000"].URL, ShouldEqual, "http://169.254.1.1:9000")
 
 		})
 

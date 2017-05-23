@@ -267,11 +267,6 @@ func (provider *Sidecar) makeBackends(sidecarStates *catalog.ServicesState) map[
 
 			if svc.IsAlive() {
 				for _, port := range svc.Ports {
-					name := svc.Hostname
-					if len(svc.Ports) > 1 {
-						name = fmt.Sprintf("%s_%d", svc.Hostname, port.Port)
-					}
-
 					host := port.IP
 					if host == "" {
 						ipAddr, err := net.LookupIP(svc.Hostname)
@@ -284,6 +279,8 @@ func (provider *Sidecar) makeBackends(sidecarStates *catalog.ServicesState) map[
 						}
 					}
 
+					// A service can expose multiple ports on the same host
+					name := fmt.Sprintf("%s_%d", svc.Hostname, port.Port)
 					backend.Servers[name] = types.Server{
 						URL: fmt.Sprintf("http://%s:%d", host, port.Port),
 					}
