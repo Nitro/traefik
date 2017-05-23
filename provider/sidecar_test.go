@@ -88,65 +88,108 @@ func TestSidecar(t *testing.T) {
 				Endpoint: "http://some.dummy.service",
 			}
 
-			dummyState.AddServiceEntry(
-				service.Service{
-					ID:       "008",
-					Name:     "api",
-					Hostname: "another-aws-host",
-					Status:   0,
-					Ports: []service.Port{
-						{
-							Type:        "tcp",
-							Port:        8000,
-							ServicePort: 8000,
-							IP:          "127.0.0.1",
-						},
-						{
-							Type:        "udp",
-							Port:        9000,
-							ServicePort: 9000,
-						},
-					},
-				},
-			)
+			Convey("and add servers for services with a single port exposed", func() {
+				states, err := prov.fetchState()
+				So(err, ShouldBeNil)
 
-			dummyState.AddServiceEntry(
-				service.Service{
-					ID:       "009",
-					Name:     "sso",
-					Hostname: "yet-another-aws-host",
-					Status:   1,
-					Ports: []service.Port{
-						{
-							Type:        "tcp",
-							Port:        8000,
-							ServicePort: 8000,
-							IP:          "127.0.0.1",
+				backs := prov.makeBackends(states)
+
+				So(backs, ShouldContainKey, "web")
+
+				So(backs["web"].LoadBalancer.Method, ShouldEqual, "wrr")
+				So(backs["web"].Servers["some-aws-host_8000"].URL, ShouldEqual, "http://127.0.0.1:8000")
+			})
+
+			Convey("and add servers for services with multiple ports exposed", func() {
+				dummyState.AddServiceEntry(
+					service.Service{
+						ID:       "008",
+						Name:     "api",
+						Hostname: "another-aws-host",
+						Status:   0,
+						Ports: []service.Port{
+							{
+								Type:        "tcp",
+								Port:        8000,
+								ServicePort: 8000,
+								IP:          "127.0.0.1",
+							},
+							{
+								Type:        "udp",
+								Port:        9000,
+								ServicePort: 9000,
+								IP:          "127.0.0.1",
+							},
 						},
 					},
-				},
-			)
+				)
 
-			states, err := prov.fetchState()
-			So(err, ShouldBeNil)
+				states, err := prov.fetchState()
+				So(err, ShouldBeNil)
 
-			backs := prov.makeBackends(states)
+				backs := prov.makeBackends(states)
 
-			So(backs, ShouldContainKey, "web")
-			So(backs, ShouldContainKey, "api")
-			So(backs, ShouldContainKey, "sso")
+				So(backs, ShouldContainKey, "api")
 
-			So(backs["web"].LoadBalancer.Method, ShouldEqual, "wrr")
-			So(backs["web"].Servers["some-aws-host_8000"].URL, ShouldEqual, "http://127.0.0.1:8000")
+				So(backs["api"].Servers["another-aws-host_8000"].URL, ShouldEqual, "http://127.0.0.1:8000")
+				So(backs["api"].Servers["another-aws-host_9000"].URL, ShouldEqual, "http://127.0.0.1:9000")
+			})
 
-			// A server can have multiple ports exposed
-			So(backs["api"].Servers["another-aws-host_8000"].URL, ShouldEqual, "http://127.0.0.1:8000")
-			// Don't add the server if the service.Port does not contain the IP address
-			// and the hostname IP address can't be resolved
-			So(backs["api"].Servers, ShouldNotContainKey, "another-aws-host_9000")
+			Convey("and not add servers for which the IP cannot be obtained", func() {
+				dummyState.AddServiceEntry(
+					service.Service{
+						ID:       "008",
+						Name:     "api",
+						Hostname: "another-aws-host",
+						Status:   0,
+						Ports: []service.Port{
+							{
+								Type:        "tcp",
+								Port:        8000,
+								ServicePort: 8000,
+							},
+						},
+					},
+				)
 
-			// Don't add servers for services that are not alive
-			So(backs["sso"].Servers, ShouldBeEmpty)
+				states, err := prov.fetchState()
+				So(err, ShouldBeNil)
+
+				backs := prov.makeBackends(states)
+
+				So(backs, ShouldContainKey, "api")
+
+				// Don't add the server if the service.Port does not contain the IP address
+				// and the hostname IP address can't be resolved
+				So(backs["api"].Servers, ShouldNotContainKey, "another-aws-host_8000")
+			})
+
+			Convey("and not add servers for services that are not alive", func() {
+				dummyState.AddServiceEntry(
+					service.Service{
+						ID:       "009",
+						Name:     "sso",
+						Hostname: "yet-another-aws-host",
+						Status:   1,
+						Ports: []service.Port{
+							{
+								Type:        "tcp",
+								Port:        8000,
+								ServicePort: 8000,
+								IP:          "127.0.0.1",
+							},
+						},
+					},
+				)
+
+				states, err := prov.fetchState()
+				So(err, ShouldBeNil)
+
+				backs := prov.makeBackends(states)
+
+				So(backs, ShouldContainKey, "sso")
+				So(backs["sso"].Servers, ShouldBeEmpty)
+			})
 		})
 
 		Convey("construct config", func() {
