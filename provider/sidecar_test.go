@@ -32,7 +32,7 @@ func TestSidecar(t *testing.T) {
 				Hostname: "some-aws-host",
 				Status:   0,
 				Ports: []service.Port{
-					service.Port{
+					{
 						Type:        "tcp",
 						Port:        8000,
 						ServicePort: 8000,
@@ -95,13 +95,13 @@ func TestSidecar(t *testing.T) {
 					Hostname: "another-aws-host",
 					Status:   0,
 					Ports: []service.Port{
-						service.Port{
+						{
 							Type:        "tcp",
 							Port:        8000,
 							ServicePort: 8000,
 							IP:          "127.0.0.1",
 						},
-						service.Port{
+						{
 							Type:        "udp",
 							Port:        9000,
 							ServicePort: 9000,
@@ -117,7 +117,7 @@ func TestSidecar(t *testing.T) {
 					Hostname: "yet-another-aws-host",
 					Status:   1,
 					Ports: []service.Port{
-						service.Port{
+						{
 							Type:        "tcp",
 							Port:        8000,
 							ServicePort: 8000,
@@ -311,7 +311,7 @@ func TestSidecar(t *testing.T) {
 					Hostname: "another-aws-host",
 					Status:   0,
 					Ports: []service.Port{
-						service.Port{
+						{
 							Type:        "tcp",
 							Port:        9000,
 							ServicePort: 9000,
