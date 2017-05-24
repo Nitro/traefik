@@ -5,6 +5,7 @@ die() {
     exit 1
 }
 
+go generate
 CGO_ENABLED=0 GOOS=linux go build
 
 file traefik | grep "ELF.*LSB" || die "../traefik is missing or not a Linux binary"
