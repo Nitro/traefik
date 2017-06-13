@@ -5,6 +5,10 @@ die() {
     exit 1
 }
 
+if [ ! -d "static" ]; then
+    make generate-webui
+fi
+
 go generate
 CGO_ENABLED=0 GOOS=linux go build
 
