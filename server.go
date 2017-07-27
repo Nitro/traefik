@@ -566,6 +566,9 @@ func (server *Server) loadConfig(configurations configs, globalConfiguration Glo
 
 	backendsHealthcheck := map[string]*healthcheck.BackendHealthCheck{}
 
+	// Clean up the backendConnLimits map each time we reload the config
+	server.backendConnLimits = make(map[string]*connlimit.ConnLimiter)
+
 	var errorPageHandler utils.ErrorHandler
 	if globalConfiguration.ErrorPages != nil {
 		errorPageHandler = middlewares.NewErrorPagesHandler(globalConfiguration.ErrorPages.ErrorPage)
