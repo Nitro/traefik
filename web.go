@@ -379,9 +379,14 @@ func (provider *WebProvider) getConnStatsHandler(response http.ResponseWriter, r
 		for b := range currentConfigurations[p].Backends {
 			if connLimiter, ok := provider.server.backendConnLimits[b]; ok {
 				if totalConn, ok := getTotalConn(connLimiter); ok {
-					payload[p].Backends[b] = connStats{
-						MaxConn:   currentConfigurations[p].Backends[b].MaxConn.Amount,
-						TotalConn: totalConn,
+					// Make sure that the current configuration contains this backend before trying to read it
+					if currentBackend, ok := currentConfigurations[p].Backends[b]; ok {
+						if currentBackend.MaxConn != nil {
+							payload[p].Backends[b] = connStats{
+								MaxConn:   currentBackend.MaxConn.Amount,
+								TotalConn: totalConn,
+							}
+						}
 					}
 				}
 			}
