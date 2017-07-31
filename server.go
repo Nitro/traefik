@@ -89,7 +89,6 @@ func NewServer(globalConfiguration GlobalConfiguration) *Server {
 		// leadership creation if cluster mode
 		server.leadership = cluster.NewLeadership(server.routinesPool.Ctx(), globalConfiguration.Cluster)
 	}
-	server.backendConnLimits = make(map[string]*connlimit.ConnLimiter)
 
 	return server
 }
@@ -565,6 +564,9 @@ func (server *Server) loadConfig(configurations configs, globalConfiguration Glo
 	backends := map[string]http.Handler{}
 
 	backendsHealthcheck := map[string]*healthcheck.BackendHealthCheck{}
+
+	// Clean up the backendConnLimits map each time we reload the config
+	server.backendConnLimits = make(map[string]*connlimit.ConnLimiter)
 
 	var errorPageHandler utils.ErrorHandler
 	if globalConfiguration.ErrorPages != nil {
