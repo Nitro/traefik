@@ -89,7 +89,6 @@ func NewServer(globalConfiguration GlobalConfiguration) *Server {
 		// leadership creation if cluster mode
 		server.leadership = cluster.NewLeadership(server.routinesPool.Ctx(), globalConfiguration.Cluster)
 	}
-	server.backendConnLimits = make(map[string]*connlimit.ConnLimiter)
 
 	return server
 }
