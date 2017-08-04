@@ -4,10 +4,10 @@ var d3 = require('d3');
 /** @ngInject */
 function ConnStatsController($scope, $interval, $log, $filter, ConnStats) {
   var vm = this,
-    refreshInterval = 2000, // milliseconds
-    // Store and display data for the past 30 minutes
-    maxHistoricDataPointCount = 1800 / (refreshInterval / 1000),
-    dataPointStorageTime = 1800 * 1000;
+    refreshInterval = 2 * 1000, // milliseconds
+    // Store and display data for the past 10 minutes
+    maxHistoricDataPointCount = 600 / (refreshInterval / 1000),
+    dataPointStorageTime = 600 * 1000; //milliseconds
 
   vm.graph = {
     historicalConnCount: {},
