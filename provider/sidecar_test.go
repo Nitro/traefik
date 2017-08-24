@@ -370,7 +370,6 @@ func TestSidecar(t *testing.T) {
 
 			So(configMsg.Configuration.Backends, ShouldContainKey, "api")
 			So(configMsg.Configuration.Backends["api"].Servers["another-aws-host_9000"].URL, ShouldEqual, "http://169.254.1.1:9000")
-
 		})
 
 		Reset(func() {
